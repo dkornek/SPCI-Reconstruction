@@ -30,7 +30,54 @@ TO-DO:
     4.3 generate file with image properties (e.g. SNR, resolution ...)
 */
 
+#include <iostream>
+#include <string>
+
+#include "navigation.h"
+
 
 int main(){
+
+    // start application
+    Navigation menu;
+    int choice;
+    std::string measurementsPath;
+
+    for (;;){
+        // choose option from main menu
+        menu.mainMenu();
+        choice = menu.promptInput();
+        choice = menu.checkInput(choice, 1, 2);
+
+        if (choice == 2){
+            // quit application
+            std::cout << "Application shut down.\n";
+            break;
+
+        } else{
+            // choose option from image reconstruction menu
+            menu.measurementsMenu();
+            choice = menu.promptInput();
+            choice = menu.checkInput(choice, 1, 2);
+
+            if (choice == 2){
+                // go one step back
+                continue;
+
+            } else{
+                // prompt for path of measurement data
+                measurementsPath = menu.promptPath();
+                std::cout << "Location: " << measurementsPath << std::endl;
+
+                // check for valid path
+                // if (invalid path){
+                //     try again
+                // } else{
+                //     // choose option from algorithm menu
+                // }
+            }
+        }
+    }
+
     return 0;
 }
