@@ -37,45 +37,23 @@ TO-DO:
 
 
 int main(){
-
     // start application
-    Navigation menu;
-    int choice;
+    TemplateMenu* currentMenu;
+    currentMenu = new MainMenu;
+
     std::string measurementsPath;
+    std::string projectionMatrixPath;
 
-    for (;;){
-        // choose option from main menu
-        menu.mainMenu();
-        choice = menu.promptInput();
-        choice = menu.checkInput(choice, 1, 2);
+    bool isQuitOptionSelected;
+    isQuitOptionSelected = false;  // shut down application if true
 
-        if (choice == 2){
-            // quit application
-            std::cout << "Application shut down.\n";
-            break;
+    while(!isQuitOptionSelected){
+        currentMenu->show();
+        TemplateMenu* nextMenu = currentMenu->getNextMenu(isQuitOptionSelected);
 
-        } else{
-            // choose option from image reconstruction menu
-            menu.measurementsMenu();
-            choice = menu.promptInput();
-            choice = menu.checkInput(choice, 1, 2);
-
-            if (choice == 2){
-                // go one step back
-                continue;
-
-            } else{
-                // prompt for path of measurement data
-                measurementsPath = menu.promptPath();
-                std::cout << "Location: " << measurementsPath << std::endl;
-
-                // check for valid path
-                // if (invalid path){
-                //     try again
-                // } else{
-                //     // choose option from algorithm menu
-                // }
-            }
+        if (nextMenu){
+            delete currentMenu;
+            currentMenu = nextMenu;
         }
     }
 

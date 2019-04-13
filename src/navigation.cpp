@@ -2,93 +2,136 @@
 
 #include "navigation.h"
 
-#include <iostream>
 #include <boost/lexical_cast.hpp>
 
 
-int Navigation::promptInput(){
+// ##### TEMPLATE MENU #####
+void TemplateMenu::promptChoice(int& iChoice){
     // prompt user for choosing an option
 
     std::string input;
-    int choice;
-
     for (;;){
-        std::cin >> input;
+        std::cout << "SELECT: ";
+        std::cin >> input;  // get user input
 
         try{
-            choice = boost::lexical_cast<int>(input);
+            iChoice = boost::lexical_cast<int>(input);
             break;  // success
         } catch(const boost::bad_lexical_cast &e){
-            std::cerr << e.what() << '\n';  // print error message
-            std::cout << "MUST BE INTEGER, SELECT: ";
+            std::cerr << e.what() << "\n";  // print error message
         }
     }
-
-    return choice;
 }
 
-std::string Navigation::promptPath(){
+std::string TemplateMenu::promptPath(){
     // prompt user for a file path
 
-    std::string filePath;
-    std::cout << "TYPE PATH: ";
-    std::cin >> filePath;
-    return filePath;
+    std::string input;
+    std::cout << "TYPE PATH TO FILE: ";
+    std::cin >> input;
+
+    return input;
 }
 
-int Navigation::checkInput(int choice, int lowerValue, int upperValue){
-    // check input for validity
-    // if not valid, call getInput()
-
-    if (choice >= lowerValue && choice <= upperValue){
-        return choice;
-    } else{
-        std::cout << "SELECT: ";
-        return this->checkInput(this->promptInput(), lowerValue, upperValue);
-    }
-}
-
-void Navigation::mainMenu(){
+// ##### MAIN MENU #####
+MainMenu::MainMenu(){
     // display main menu
 
-    std::cout << "MAIN MENU\n";
-    std::cout << "1 - Image Reconstruction\n";
-    std::cout << "2 - Quit\n";
-    std::cout << "SELECT: ";
+    std::string title("\nMAIN MENU\n");
+    std::string option1("1 - Image Reconstruction\n");
+    std::string option2("2 - Quit\n");
+
+    messageText = title + option1 + option2;
 }
 
-void Navigation::measurementsMenu(){
+TemplateMenu* MainMenu::getNextMenu(bool &iIsQuitOptionSelected){
+    // prompt user for next menu
+
+    TemplateMenu* iNextMenu;
+    iNextMenu = 0;
+
+    int iChoice;
+    this->promptChoice(iChoice);
+
+    switch (iChoice){
+    case 1:
+        iNextMenu = new ReconstructionMenu;
+        break;
+    case 2:
+        std::cout << "\nApplication shut down.\n";
+        iIsQuitOptionSelected = true;
+        break;
+    default:
+        break;
+    }
+
+    return iNextMenu;
+}
+
+// ##### MEASUREMENTS MENU #####
+ReconstructionMenu::ReconstructionMenu(){
     // display image reconstruction menu
 
-    std::cout << "IMAGE RECONSTRUCTION MENU\n";
-    std::cout << "1 - Choose *.root file\n";
-    std::cout << "2 - Back\n";
-    std::cout << "SELECT: ";
+    std::string title("\nIMAGE RECONSTRUCTION MENU\n");
+    std::string option1("1 - Choose *.root file of measurements\n");
+    std::string option2("2 - Back\n");
+
+    messageText = title + option1 + option2;
 }
 
-void Navigation::algorithmMenu(){
-    // display algorithm menu
+TemplateMenu* ReconstructionMenu::getNextMenu(bool &iIsQuitOptionSelected){
+    // prompt user to locate a measurements file or to go one step back
 
-    std::cout << "ALGORITHM MENU\n";
-    std::cout << "1 - Maximum Likelihood Expectation Maximization\n";
-    std::cout << "2 - Origin Ensemble\n";
-    std::cout << "SELECT: ";
+    TemplateMenu* iNextMenu;
+    iNextMenu = 0;
+
+    std::string iPath;
+
+    int iChoice;
+    this->promptChoice(iChoice);
+
+    switch (iChoice) {
+    case 1:
+        iPath = this->promptPath();
+        std::cout << "You said: " << iPath << "\n";
+
+        // if path found -> algorithm menu
+
+        break;
+    case 2:
+        iNextMenu = new MainMenu;
+        break;
+    default:
+        break;
+    }
+
+    iIsQuitOptionSelected = false;
+    return iNextMenu;
 }
 
 
+//int Navigation::checkInput(int choice, int lowerValue, int upperValue){
+//    // check input for validity
+//    // if not valid, call getInput()
+
+//    if (choice >= lowerValue && choice <= upperValue){
+//        return choice;
+//    } else{
+//        std::cout << "SELECT: ";
+//        return this->checkInput(this->promptInput(), lowerValue, upperValue);
+//    }
 
 
-//int reconstructionPrompt(){
-//    // prompt user to set the reconstruction algorithm
+//void Navigation::algorithmMenu(){
+//    // display algorithm menu
 
-//    int answer;
-//    answer = 0;
-
-//    std::cout << "Mode:" << std::endl;
-
-
-//    return answer;
+//    std::cout << "ALGORITHM MENU\n";
+//    std::cout << "1 - Maximum Likelihood Expectation Maximization\n";
+//    std::cout << "2 - Origin Ensemble\n";
+//    std::cout << "SELECT: ";
 //}
+
+
 
 //int projectionMatrixPrompt(){
 //    // prompt user to set the projection matrix
