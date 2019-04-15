@@ -9,8 +9,6 @@ file(GLOB_RECURSE sources src/*.cpp src/*.h)
 add_executable(SPCI-Reconstruction ${sources})
 
 # Include ROOT to be compiled
-# execute_process(COMMAND root-config --cflags --glibs OUTPUT_VARIABLE root_flags)
-# target_compile_options(SPCI-Reconstruction PUBLIC ${root_flags} -Wall -Wextra -Wfloat-conversion)  not working :(
 target_compile_options(SPCI-Reconstruction PUBLIC -pthread -std=c++11
     -m64 -I/opt/root/root-6.12.04/include -L/opt/root/root-6.12.04/lib
     -lGui -lCore -lImt -lRIO -lNet -lHist -lGraf -lGraf3d -lGpad -lTree -lTreePlayer -lRint -lPostscript
@@ -19,8 +17,11 @@ target_compile_options(SPCI-Reconstruction PUBLIC -pthread -std=c++11
 
 ##### DEPENDENCIES #####
 find_package(Boost 1.60.0)
-
 target_link_libraries(SPCI-Reconstruction PUBLIC ${Boost_LIBRARIES})
+
+# list(APPEND CMAKE_PREFIX_PATH $ENV{ROOTSYS})
+find_package(ROOT)
+target_link_libraries(SPCI-Reconstruction PUBLIC ${ROOT_LIBRARIES})
 
 ##### PACKAGING #####
 install(TARGETS SPCI-Reconstruction DESTINATION SPCI-Reconstruction_destination)
