@@ -4,24 +4,15 @@
 #pragma once
 #include <iostream>
 #include <string>
+#include <TString.h>
 
-//class Navigation{
-
-//public:
-//    std::string promptPath();
-//    int checkInput(int choice, int lowerValue, int upperValue);
-
-//    void algorithmMenu();
-//};
 
 class TemplateMenu{
 public:
     TemplateMenu(){ messageText = "TemplateMenu"; }
     virtual ~TemplateMenu(){}
     virtual TemplateMenu* getNextMenu(bool& iIsQuitOptionSelected) = 0;
-    virtual void show(){ std::cout << messageText; }
-    void promptChoice(int& iChoice);
-    std::string promptPath();
+    virtual void show() const { std::cout << messageText; }
 
 protected:
     std::string messageText;
@@ -37,4 +28,25 @@ class ReconstructionMenu : public TemplateMenu{
 public:
     ReconstructionMenu();
     TemplateMenu* getNextMenu(bool &iIsQuitOptionSelected);
+};
+
+class AlgorithmMenu : public TemplateMenu{
+public:
+    AlgorithmMenu(TString iPathToMeasurements);
+    TemplateMenu* getNextMenu(bool &iIsQuitOptionSelected);
+    TString pathToMeasurements;
+};
+
+class MLEMMenu : public TemplateMenu{
+public:
+    MLEMMenu(TString iPathToMeasurements);
+    TemplateMenu* getNextMenu(bool &iIsQuitOptionSelected);
+    TString pathToMeasurements;
+};
+
+class MLEMRecoMenu : public TemplateMenu{
+public:
+    MLEMRecoMenu(TString iPathToMeasurements, TString iPathToProjections);
+    TemplateMenu* getNextMenu(bool &iIsQuitOptionSelected);
+    TString pathToMeasurements, pathToProjections;
 };

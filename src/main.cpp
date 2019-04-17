@@ -30,24 +30,18 @@ TO-DO:
     4.3 generate file with image properties (e.g. SNR, resolution ...)
 */
 
-#include <iostream>
-#include <string>
 
 #include "navigation.h"
-
 
 int main(){
     // start application
     TemplateMenu* currentMenu;
     currentMenu = new MainMenu;
 
-    std::string measurementsPath;
-    std::string projectionMatrixPath;
-
     bool isQuitOptionSelected;
     isQuitOptionSelected = false;  // shut down application if true
 
-    while(!isQuitOptionSelected){
+    while (!isQuitOptionSelected){
         currentMenu->show();
         TemplateMenu* nextMenu = currentMenu->getNextMenu(isQuitOptionSelected);
 
