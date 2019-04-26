@@ -124,7 +124,7 @@ void RebinningProjections(TFile& file, TString path){
     next.Reset();
     while ((key = (TKey*)next())){
         spectra = (TDirectory*)file.Get(key->GetName());
-        TDirectory* subDir = newFile->mkdir(key->GetName());
+        TDirectory* subDir = newFile->mkdir(key->GetName(), key->GetTitle());
         subDir->cd();
 
         TIter nextVoxel(spectra->GetListOfKeys());
