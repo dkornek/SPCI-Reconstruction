@@ -156,7 +156,6 @@ void RebinningMacro(){
         cout << "File not found.\n";
         return;
     }
-
     if (choice == 1){
         RebinningMeasurements(*pFile, pathToFile);
     }
