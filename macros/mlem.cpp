@@ -1,8 +1,3 @@
-/*
- * TO DO
- * Remove Root Part
-*/
-
 #include <iostream>
 #include <chrono>
 
@@ -110,6 +105,8 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
     }
 
     Int_t numberOfIterations = 0;
+    auto t1 = std::chrono::steady_clock::now();
+
     for (;;++numberOfIterations){
         this->calculate();
 
@@ -123,8 +120,12 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
             break;
         }
     }
+    auto t2 = std::chrono::steady_clock::now();
+    auto elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
 
-    std::cout << "Image reconstruction done. Steps: " << numberOfIterations << std::endl;
+
+    std::cout << "Image reconstruction done. Steps: " << numberOfIterations << "\n";
+    std::cout << "\nCalculation time: " << elapsedTime << " seconds\n";
 }
 
 // ##### PRIVATE FUNCTIONS #####
@@ -403,8 +404,6 @@ void ReconstructionMLEM::calculate(){
 
 // ##### ROOT #####
 void mlem(){
-    auto t1 = std::chrono::steady_clock::now();
-
     // create an instance of the reconstruction class
     TString pathM = "../data/measurement_data/bins_50/500_keV/SPCIPos1_50_bins.root";
     TString pathP = "../data/projection_data/bins_50/SPCIBase49_50_bins.root";
@@ -438,10 +437,6 @@ void mlem(){
 //    gamma->Update();
 
 //    delete reco;
-
-    auto t2 = std::chrono::steady_clock::now();
-    auto elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
-    std::cout << "\nIt took: " << elapsedTime << " seconds\n";
 }
 
 #ifndef __CINT__
