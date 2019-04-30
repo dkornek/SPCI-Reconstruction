@@ -1,6 +1,7 @@
 // mlem.cpp
 
 #include "mlem.h"
+
 #include <iostream>
 #include <chrono>
 
@@ -57,18 +58,16 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
         this->calculate();
 
         if (numberOfIterations == maxNumberOfIterations){
-            std::cout << numberOfIterations << std::endl;
             break;
         }
 
         if ((this->deviation >= stopCriterion) && (this->deviation <= 1.0)){
-            std::cout << this->deviation << std::endl;
             break;
         }
     }
+
     auto t2 = std::chrono::steady_clock::now();
     auto elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
-
 
     std::cout << "Image reconstruction done. Steps: " << numberOfIterations << "\n";
     std::cout << "\nCalculation time: " << elapsedTime << " seconds\n";

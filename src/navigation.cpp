@@ -1,53 +1,102 @@
 // navigation.cpp
 
 #include "navigation.h"
+
 #include "mlem.h"
+#include "image_processing.h"
+
 #include <boost/lexical_cast.hpp>
 #include <TFile.h>
 
 
-int promptChoice(std::string iPrompt = "SELECT: "){
+int promptChoice(std::string promptString = "SELECT: "){
     // prompt user for choosing an option
 
     std::string input;
-    int iChoice;
+    int choice;
 
     for (;;){
-        std::cout << iPrompt;
+        std::cout << promptString;
         std::cin >> input;  // get user input
 
         try{
-            iChoice = boost::lexical_cast<int>(input);
+            choice = boost::lexical_cast<int>(input);
             break;  // success
+
         } catch(const boost::bad_lexical_cast &e){
             std::cerr << e.what() << "\n";  // print error message
         }
     }
 
-    return iChoice;
+    return choice;
 }
 
-bool checkPath(TString iPath){
+double promptStopCriterion(){
+    // prompt user for choosing an abort criterion for the iterative formula
+
+    std::string input;
+    double choice;
+
+    for (;;){
+        std::cout << "CHOOSE AN ABORT CRITERIUM (0 .. <= 1): ";
+        std::cin >> input;  // get user input
+
+        try{
+            choice = boost::lexical_cast<double>(input);
+
+            if ((choice <= 0) || (choice > 1)){
+                continue;
+
+            } else{
+                break;  // success
+            }
+
+        } catch(const boost::bad_lexical_cast &e){
+            std::cerr << e.what() << "\n";  // print error message
+        }
+    }
+
+    return choice;
+}
+
+bool checkPath(TString path){
     // check validity of path to .root file
 
-    TFile iFile(iPath, "READ");
-    if (iFile.IsOpen()){
+    TFile* file = new TFile(path, "READ");
+
+    if (file->IsOpen()){
         std::cout << "File opened successfully.\n";
-        iFile.Close();
+        file->Close();
         return true;
+
     } else{
         std::cout << "Invalid file path.\n";
         return false;
     }
 }
 
-TString promptPath(){
+TString promptPath(std::string promptString){
     // prompt user for a file path
 
     TString input;
-    std::cout << "TYPE PATH TO FILE: ";
-    std::cin >> input;
 
+    for (;;){
+        std::cout << promptString;
+        std::cin >> input;  // get user input
+
+        if (checkPath(input)){
+            break;  // success
+        }
+    }
+
+    return input;
+}
+
+TString promptFileName(){
+    // prompt user for a file name
+
+    TString input;
+    std::cin >> input;
     return input;
 }
 
@@ -56,31 +105,33 @@ MainMenu::MainMenu(){
     // display main menu
 
     std::string title("\nMAIN MENU\n");
-    std::string option1("1 - Image Reconstruction\n");
-    std::string option2("2 - Quit\n");
+    std::string option1("1 - Quit\n");
+    std::string option2("2 - Image Reconstruction\n");
 
     messageText = title + option1 + option2;
 }
 
-TemplateMenu* MainMenu::getNextMenu(bool &iIsQuitOptionSelected){
+TemplateMenu* MainMenu::getNextMenu(bool& isQuitOptionSelected){
     // prompt user for next menu
 
-    TemplateMenu* iNextMenu;
-    iNextMenu = nullptr;
+    TemplateMenu* nextMenu;
+    nextMenu = nullptr;
 
     switch (promptChoice()){
     case 1:
-        iNextMenu = new ReconstructionMenu;
-        break;
-    case 2:
         std::cout << "\nApplication shut down.\n";
-        iIsQuitOptionSelected = true;
+        isQuitOptionSelected = true;
         break;
+
+    case 2:
+        nextMenu = new ReconstructionMenu();
+        break;
+
     default:
         break;
     }
 
-    return iNextMenu;
+    return nextMenu;
 }
 
 // ##### MEASUREMENTS MENU #####
@@ -88,162 +139,209 @@ ReconstructionMenu::ReconstructionMenu(){
     // display image reconstruction menu
 
     std::string title("\nIMAGE RECONSTRUCTION MENU\n");
-    std::string option1("1 - Choose *.root file of measurements\n");
-    std::string option2("2 - Back\n");
+    std::string option1("1 - Back\n");
+    std::string option2("2 - Choose *.root files\n");
 
     messageText = title + option1 + option2;
 }
 
-TemplateMenu* ReconstructionMenu::getNextMenu(bool &iIsQuitOptionSelected){
-    // prompt user to locate a measurements file or to go one step back
+TemplateMenu* ReconstructionMenu::getNextMenu(bool& isQuitOptionSelected){
+    // prompt user to specify the files
 
-    TemplateMenu* iNextMenu;
-    iNextMenu = nullptr;
+    TemplateMenu* nextMenu;
+    nextMenu = nullptr;
 
-    TString iPath;
-    bool isPathValid = false;
+    TString pathToMeasurements;
+    TString pathToProjections;
 
     switch (promptChoice()) {
     case 1:
-        while (!isPathValid){
-            // prompt user until path is valid
-            // iPath = promptPath();
-            iPath = "../test/Position_x1.5_y-1.5.root";
-            isPathValid = checkPath(iPath);
-        }
+        nextMenu = new MainMenu();
+        break;
 
-        iNextMenu = new AlgorithmMenu(iPath);
-        break;
     case 2:
-        iNextMenu = new MainMenu;
+        // pathToMeasurements = promptPath("TYPE PATH TO MEASUREMENTS FILE: ");
+        pathToMeasurements = "../data/measurement_data/bins_50/500_keV/SPCIPos1.root";
+
+        // pathToProjections = promptPath("TYPE PATH TO PROJECTIONS FILE: ");
+        pathToProjections = "../data/projection_data/bins_50/SPCIBase49_50_bins.root";
+
+        nextMenu = new AlgorithmMenu(pathToMeasurements, pathToProjections);
         break;
+
     default:
         break;
     }
 
-    iIsQuitOptionSelected = false;
-    return iNextMenu;
+    isQuitOptionSelected = false;
+    return nextMenu;
 }
 
 // ##### ALGORITHM MENU #####
-AlgorithmMenu::AlgorithmMenu(TString iPathToMeasurements){
+AlgorithmMenu::AlgorithmMenu(TString filePathToMeasurements, TString filePathToProjections) :
+    pathToMeasurements(filePathToMeasurements), pathToProjections(filePathToProjections){
     // display algorithm menu
 
     std::string title("\nALGORITHM MENU\n");
-    std::string option1("1 - Maximum Likelihood Expectation Maximization\n");
-    std::string option2("2 - Origin Ensemble\n");
-    std::string option3("3 - Back\n");
+    std::string option1("1 - Back\n");
+    std::string option2("2 - Maximum Likelihood Expectation Maximization\n");
+    std::string option3("3 - Origin Ensemble\n");
 
     messageText = title + option1 + option2 + option3;
-
-    pathToMeasurements = iPathToMeasurements;
 }
 
-TemplateMenu* AlgorithmMenu::getNextMenu(bool &iIsQuitOptionSelected){
+TemplateMenu* AlgorithmMenu::getNextMenu(bool& isQuitOptionSelected){
     // prompt user to choose the algorithm
 
-    TemplateMenu* iNextMenu;
-    iNextMenu = nullptr;
+    TemplateMenu* nextMenu;
+    nextMenu = nullptr;
 
     switch (promptChoice()) {
     case 1:
-        // MLEM Menue
-        iNextMenu = new MLEMMenu(pathToMeasurements);
+        nextMenu = new ReconstructionMenu();
         break;
+
     case 2:
-        // OE Menu
-        std::cout << "Not yet implemented!\n";
+        nextMenu = new MLEMMenu(this->pathToMeasurements, this->pathToProjections);
         break;
+
     case 3:
-        iNextMenu = new ReconstructionMenu;
+        std::cout << "Not yet implemented!\n";
+        nextMenu = new MainMenu();
+        break;
+
     default:
         break;
     }
 
-    iIsQuitOptionSelected = false;
-    return iNextMenu;
+    isQuitOptionSelected = false;
+    return nextMenu;
 }
 
 // ##### MLEM MENU #####
-MLEMMenu::MLEMMenu(TString iPathToMeasurements){
+MLEMMenu::MLEMMenu(TString filePathToMeasurements, TString filePathToProjections) :
+    pathToMeasurements(filePathToMeasurements), pathToProjections(filePathToProjections){
     // display MLEM menu
 
     std::string title("\nMLEM MENU\n");
-    std::string option1("1 - Choose *.root file of projection matrix\n");
-    std::string option2("2 - Back\n");
+    std::string option1("1 - Back\n");
+    std::string option2("2 - Choose calculation criteria\n");
 
     messageText = title + option1 + option2;
-
-    pathToMeasurements = iPathToMeasurements;
 }
 
-TemplateMenu* MLEMMenu::getNextMenu(bool &iIsQuitOptionSelected){
-    // prompt user to select the file of the projections
+TemplateMenu* MLEMMenu::getNextMenu(bool& isQuitOptionSelected){
+    // prompt user to enter calculation criteria
 
-    TemplateMenu* iNextMenu;
-    iNextMenu = nullptr;
+    TemplateMenu* nextMenu;
+    nextMenu = nullptr;
 
-    TString iPath;
-    bool isPathValid = false;
+    TString saveDataName;
+    int maxNumberOfIterations;
+    double stopCriterion;
+    ReconstructionMLEM* reco;
+    ActivityDistribution* activity;
 
     switch (promptChoice()) {
     case 1:
-        while (!isPathValid){
-            // prompt user until path is valid
-            // iPath = promptPath();
-            iPath = "../test/SPCIBase49.root";
-            isPathValid = checkPath(iPath);
-        }
+        nextMenu = new AlgorithmMenu(this->pathToMeasurements, this->pathToProjections);
+        break;
 
-        iNextMenu = new MLEMRecoMenu(pathToMeasurements, iPath);
-        break;
     case 2:
-        iNextMenu = new AlgorithmMenu(pathToMeasurements);
+        // saveDataName = promptFileName();
+        saveDataName = "../test/Activity.root";
+        // maxNumberOfIterations = promptChoice("CHOOSE MAXIMUM NUMBER OF ITERATIONS: ");
+        maxNumberOfIterations = 1000;
+        // stopCriterion = promptStopCriterion();
+        stopCriterion = 0.999;
+
+        reco = new ReconstructionMLEM(this->pathToMeasurements, this->pathToProjections);
+        reco->start(maxNumberOfIterations, stopCriterion);
+
+        activity = new ActivityDistribution(reco->A_v, saveDataName);
+        activity->save3DHistogram();
+        activity->save2DProjection();
+
+        nextMenu = new MainMenu();
         break;
+
     default:
         break;
     }
 
-    iIsQuitOptionSelected = false;
-    return iNextMenu;
+    delete activity;
+    delete reco;
+    isQuitOptionSelected = false;
+    return nextMenu;
 }
 
-MLEMRecoMenu::MLEMRecoMenu(TString iPathToMeasurements, TString iPathToProjections){
-    // display MLEM Reconstruction Menu
+//TemplateMenu* MLEMMenu::getNextMenu(bool &isQuitOptionSelected){
+//    // prompt user to select the file of the projections
 
-    std::string title("\nMLEM ALGORITHM MENU\n");
-    std::string option1("1 - Set number of iterations\n");
-    std::string option2("2 - Back\n");
+//    TemplateMenu* iNextMenu;
+//    iNextMenu = nullptr;
 
-    messageText = title + option1 + option2;
+//    TString iPath;
+//    bool isPathValid = false;
 
-    pathToMeasurements = iPathToMeasurements;
-    pathToProjections = iPathToProjections;
-}
+//    switch (promptChoice()) {
+//    case 1:
+//        while (!isPathValid){
+//            // prompt user until path is valid
+//            // iPath = promptPath();
+//            iPath = "../test/SPCIBase49.root";
+//            isPathValid = checkPath(iPath);
+//        }
 
-TemplateMenu* MLEMRecoMenu::getNextMenu(bool &iIsQuitOptionSelected){
-    // prompt user to set the iterations
+//        iNextMenu = new MLEMRecoMenu(pathToMeasurements, iPath);
+//        break;
+//    case 2:
+//        iNextMenu = new AlgorithmMenu(pathToMeasurements);
+//        break;
+//    default:
+//        break;
+//    }
 
-    TemplateMenu* iNextMenu;
-    iNextMenu = nullptr;
+//    isQuitOptionSelected = false;
+//    return iNextMenu;
+//}
 
-    int iNumberOfIterations;
+//MLEMRecoMenu::MLEMRecoMenu(TString iPathToMeasurements, TString iPathToProjections){
+//    // display MLEM Reconstruction Menu
 
-    switch (promptChoice()) {
-    case 1:
-        iNumberOfIterations = promptChoice("NUMBER OF ITERATIONS: ");
-        std::cout << "Calculating ...\n";
+//    std::string title("\nMLEM ALGORITHM MENU\n");
+//    std::string option1("1 - Set number of iterations\n");
+//    std::string option2("2 - Back\n");
 
-        // start reco, save image to disk, then show it
+//    messageText = title + option1 + option2;
 
-        iNextMenu = new MainMenu();
-        break;
-    case 2:
-        iNextMenu = new MLEMMenu(pathToMeasurements);
-    default:
-        break;
-    }
+//    pathToMeasurements = iPathToMeasurements;
+//    pathToProjections = iPathToProjections;
+//}
 
-    iIsQuitOptionSelected = false;
-    return iNextMenu;
-}
+//TemplateMenu* MLEMRecoMenu::getNextMenu(bool &isQuitOptionSelected){
+//    // prompt user to set the iterations
+
+//    TemplateMenu* iNextMenu;
+//    iNextMenu = nullptr;
+
+//    int iNumberOfIterations;
+
+//    switch (promptChoice()) {
+//    case 1:
+//        iNumberOfIterations = promptChoice("NUMBER OF ITERATIONS: ");
+//        std::cout << "Calculating ...\n";
+
+//        // start reco, save image to disk, then show it
+
+//        iNextMenu = new MainMenu();
+//        break;
+//    case 2:
+//        iNextMenu = new MLEMMenu(pathToMeasurements);
+//    default:
+//        break;
+//    }
+
+//    isQuitOptionSelected = false;
+//    return iNextMenu;
+//}

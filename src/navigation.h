@@ -11,7 +11,7 @@ class TemplateMenu{
 public:
     TemplateMenu(){ messageText = "TemplateMenu"; }
     virtual ~TemplateMenu(){}
-    virtual TemplateMenu* getNextMenu(bool& iIsQuitOptionSelected) = 0;
+    virtual TemplateMenu* getNextMenu(bool& isQuitOptionSelected) = 0;
     virtual void show() const { std::cout << messageText; }
 
 protected:
@@ -21,32 +21,34 @@ protected:
 class MainMenu : public TemplateMenu{
 public:
     MainMenu();
-    TemplateMenu* getNextMenu(bool& iIsQuitOptionSelected);
+    TemplateMenu* getNextMenu(bool& isQuitOptionSelected);
 };
 
 class ReconstructionMenu : public TemplateMenu{
 public:
     ReconstructionMenu();
-    TemplateMenu* getNextMenu(bool &iIsQuitOptionSelected);
+    TemplateMenu* getNextMenu(bool& isQuitOptionSelected);
 };
 
 class AlgorithmMenu : public TemplateMenu{
 public:
-    AlgorithmMenu(TString iPathToMeasurements);
-    TemplateMenu* getNextMenu(bool &iIsQuitOptionSelected);
+    AlgorithmMenu(TString filePathToMeasurements, TString filePathToProjections);
+    TemplateMenu* getNextMenu(bool& isQuitOptionSelected);
     TString pathToMeasurements;
+    TString pathToProjections;
 };
 
 class MLEMMenu : public TemplateMenu{
 public:
-    MLEMMenu(TString iPathToMeasurements);
-    TemplateMenu* getNextMenu(bool &iIsQuitOptionSelected);
+    MLEMMenu(TString filePathToMeasurements, TString filePathToProjections);
+    TemplateMenu* getNextMenu(bool& isQuitOptionSelected);
     TString pathToMeasurements;
+    TString pathToProjections;
 };
 
-class MLEMRecoMenu : public TemplateMenu{
-public:
-    MLEMRecoMenu(TString iPathToMeasurements, TString iPathToProjections);
-    TemplateMenu* getNextMenu(bool &iIsQuitOptionSelected);
-    TString pathToMeasurements, pathToProjections;
-};
+//class MLEMRecoMenu : public TemplateMenu{
+//public:
+//    MLEMRecoMenu(TString iPathToMeasurements, TString iPathToProjections);
+//    TemplateMenu* getNextMenu(bool &isQuitOptionSelected);
+//    TString pathToMeasurements, pathToProjections;
+//};
