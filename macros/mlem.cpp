@@ -408,7 +408,7 @@ void mlem(){
     TString pathM = "../data/measurement_data/bins_50/500_keV/SPCIPos1_50_bins.root";
     TString pathP = "../data/projection_data/bins_50/SPCIBase49_50_bins.root";
     ReconstructionMLEM* reco = new ReconstructionMLEM(pathM, pathP);
-    reco->start(1000, 0.99999);
+//    reco->start(1000, 0.99999);
 
     gStyle->SetPalette(kRainBow);
 //    gStyle->SetOptStat("iourmen");
