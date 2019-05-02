@@ -45,10 +45,3 @@ public:
     TString pathToMeasurements;
     TString pathToProjections;
 };
-
-//class MLEMRecoMenu : public TemplateMenu{
-//public:
-//    MLEMRecoMenu(TString iPathToMeasurements, TString iPathToProjections);
-//    TemplateMenu* getNextMenu(bool &isQuitOptionSelected);
-//    TString pathToMeasurements, pathToProjections;
-//};
