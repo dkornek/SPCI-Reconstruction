@@ -13,6 +13,7 @@
 #include <TH3.h>
 
 
+// ##### RECONSTRUCTION #####
 class ReconstructionMLEM{
 public:
     ReconstructionMLEM(TString pathToMeasurements, TString pathToProjections);
@@ -430,6 +431,7 @@ void ReconstructionMLEM::calculate(){
     delete currentActivity;
 }
 
+
 // ##### ROOT #####
 void mlem(){
     // create an instance of the reconstruction class
@@ -450,6 +452,7 @@ void mlem(){
                 kFALSE);  // Plotting option
 }
 
+// ##### COMPILE FILE #####
 #ifndef __CINT__
 int main(){
     mlem();
