@@ -70,7 +70,7 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
     auto elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
 
     std::cout << "Image reconstruction done. Steps: " << numberOfIterations << "\n";
-    std::cout << "\nCalculation time: " << elapsedTime << " seconds\n";
+    std::cout << "Calculation time: " << elapsedTime << " seconds\n";
 }
 
 // ##### PRIVATE FUNCTIONS #####

@@ -13,9 +13,8 @@ public:
     ~ActivityDistribution();
     void save3DHistogram();
     void save2DProjection();
-//    void save2DSlices();
+    void save2DSlices();
 
     TFile* saveData;
     TH3F* activity;
-    TH2D* projection;
 };
