@@ -1,3 +1,9 @@
+// ROOT Macro using the Maximum Likelihood Expectation Maximization algorithm for SPCI-Reconstruction
+
+// author: Dominik Kornek <dominik.kornek@gmail.com>
+// last modified: 19-05-02
+
+
 #include <iostream>
 #include <chrono>
 
@@ -11,7 +17,7 @@ class ReconstructionMLEM{
 public:
     ReconstructionMLEM(TString pathToMeasurements, TString pathToProjections);
     ~ReconstructionMLEM();
-    void start(Int_t maxNumberOfIterations, Double_t stopCriterion);
+    void start(Int_t maxNumberOfIterations, Double_t stopCriterion, Bool_t doPlotting);
 
     // Activity distribution
     TH3F* A_v;
@@ -35,6 +41,7 @@ private:
 
     // ##### MEMBERS #####
 
+    TCanvas* canvas;
     Bool_t isCalculationValid;
     Double_t deviation;
 
@@ -83,6 +90,10 @@ ReconstructionMLEM::ReconstructionMLEM(TString pathToMeasurements, TString pathT
     // prepare the homogeneous activity distribution A_v
     // A_v = activity in voxel v of the image space
     this->createA_v();
+
+    // show the image reconstruction process
+    this->canvas = new TCanvas("activity", "Reconstruction", 10, 10, 1000, 450);
+    this->canvas->Divide(2, 1);
 }
 
 ReconstructionMLEM::~ReconstructionMLEM(){
@@ -96,7 +107,7 @@ ReconstructionMLEM::~ReconstructionMLEM(){
     delete this->projectionsFile;
 }
 
-void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriterion){
+void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriterion, Bool_t doPlotting){
     // execute the calculation
 
     this->checkValidity();
@@ -110,22 +121,39 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
     for (;;++numberOfIterations){
         this->calculate();
 
+        if (doPlotting && (numberOfIterations % 10 == 0)){
+            this->canvas->cd(1);
+            this->A_v->Draw("BOX");
+
+            this->canvas->cd(2);
+            TH2D* projection = (TH2D*)this->A_v->Project3D("yx");
+            projection->Draw("COLZ");
+
+            this->canvas->Update();
+        }
+
         if (numberOfIterations == maxNumberOfIterations){
-            std::cout << numberOfIterations << std::endl;
             break;
         }
 
         if ((this->deviation >= stopCriterion) && (this->deviation <= 1.0)){
-            std::cout << this->deviation << std::endl;
             break;
         }
     }
     auto t2 = std::chrono::steady_clock::now();
     auto elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
 
-
     std::cout << "Image reconstruction done. Steps: " << numberOfIterations << "\n";
     std::cout << "\nCalculation time: " << elapsedTime << " seconds\n";
+
+    this->canvas->cd(1);
+    this->A_v->Draw("BOX");
+
+    this->canvas->cd(2);
+    TH2D* projection = (TH2D*)this->A_v->Project3D("yx");
+    projection->Draw("COLZ");
+
+    this->canvas->Update();
 }
 
 // ##### PRIVATE FUNCTIONS #####
@@ -405,38 +433,21 @@ void ReconstructionMLEM::calculate(){
 // ##### ROOT #####
 void mlem(){
     // create an instance of the reconstruction class
-    TString pathM = "../data/measurement_data/bins_50/500_keV/SPCIPos1_50_bins.root";
-    TString pathP = "../data/projection_data/bins_50/SPCIBase49_50_bins.root";
-    ReconstructionMLEM* reco = new ReconstructionMLEM(pathM, pathP);
-//    reco->start(1000, 0.99999);
 
-    gStyle->SetPalette(kRainBow);
-//    gStyle->SetOptStat("iourmen");
-    gStyle->SetOptStat(kFALSE);
+    // Specify the location of the measurement file
+    TString pathToMeasurements = "../folder/subfolder/*.root";
 
-//    TCanvas* alpha = new TCanvas("a", "3D Activity distribution", 600, 400);
-//    reco->A_v->Draw("BOX");
-//    alpha->Update();
+    // Specify the location of the projections file
+    TString pathToProjection = "../folder/subfolder/*.root";
 
-//    TCanvas* beta = new TCanvas("b", "2D Projection", 600, 400);
-//    TH2D* projection = (TH2D*)reco->A_v->Project3D("yx");
-//    projection->Draw("COLZ");
-//    beta->Update();
+    // Reconstruct the image
+    Int_t maximumNumberOfIterations = 1000;
+    Double_t stopCriterion = 0.9999;
 
-//    TCanvas* gammma = new TCanvas("c", "2D Slice", 600, 400);
-//    TH2F* slice = new TH2F("2d_slice", "2D Activity distribution",
-//                           7, 0, 7,
-//                           7, 0, 7);
-//    for (Int_t d = 1; d <= 7; ++d){
-//        for (Int_t c = 1; c <= 7; ++c){
-//            slice->SetBinContent(d, c, reco->A_v->GetBinContent(d, c, 1));
-//        }
-//    }
-
-//    slice->Draw("COLZ");
-//    gamma->Update();
-
-//    delete reco;
+    ReconstructionMLEM* reco = new ReconstructionMLEM(pathToMeasurements, pathToProjection);
+    reco->start(maximumNumberOfIterations,
+                stopCriterion,
+                kFALSE);  // Plotting option
 }
 
 #ifndef __CINT__
