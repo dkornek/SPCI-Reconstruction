@@ -6,7 +6,7 @@ Tool for backprojection of activity distributions measured with *Single Plane Co
 
 ## Image reconstruction
 SPCC consist of two distinct detector materials arranged in a checkerboard pattern in a plane. Energy spectra due to incoherent scattering can be obtained for any detector pair. These spectra are used to backproject the probable activity distribution. The algorithms used are:
-* [maximum likelihood expectation maximization](https://en.wikipedia.org/wiki/Expectation%E2%80%93maximization_algorithm) -- *yet to be implemented*
+* [maximum likelihood expectation maximization](https://en.wikipedia.org/wiki/Expectation%E2%80%93maximization_algorithm)
 * [origin ensemble](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2590772/) -- *yet to be implemented*
 
 ---
