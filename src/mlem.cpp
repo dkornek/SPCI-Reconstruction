@@ -337,9 +337,21 @@ void ReconstructionMLEM::calculate(){
         activityInVoxel = currentActivity->GetBinContent(indexX + 1, indexY + 1, indexZ + 1);
 
         // calculate correction factor
-        p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi())->Clone("Current Probability");
-        p_dcb->Multiply(quotient);
-        correctionFactor = p_dcb->Integral();
+        // costs memory + slow
+        // p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi())->Clone("Current Probability");
+        // p_dcb->Multiply(quotient);
+        // correctionFactor = p_dcb->Integral();
+
+        // faster method
+        p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi());
+        correctionFactor = 0.0;
+        for (Int_t d = 1; d <= this->numberOfDetectors; ++d){
+            for (Int_t c = 1; c <= this->numberOfDetectors; ++c){
+                for (Int_t bin = 1; bin <= this->NbinsProjections; ++bin){
+                    correctionFactor += p_dcb->GetBinContent(d, c, bin) * quotient->GetBinContent(d, c, bin);
+                }
+            }
+        }
 
         // calculate new activity A_v
         this->A_v->SetBinContent(indexX + 1, indexY + 1, indexZ + 1,
