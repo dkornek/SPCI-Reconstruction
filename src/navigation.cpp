@@ -161,11 +161,11 @@ TemplateMenu* ReconstructionMenu::getNextMenu(bool& isQuitOptionSelected){
         break;
 
     case 2:
-        pathToMeasurements = promptPath("TYPE PATH TO MEASUREMENTS FILE: ");
-        // pathToMeasurements = "../data/measurement_data/bins_50/500_keV/SPCIPos1.root";
+        // pathToMeasurements = promptPath("TYPE PATH TO MEASUREMENTS FILE: ");
+        pathToMeasurements = "../data/measurement_data/bins_50/500_keV/SPCIPos1.root";
 
-        pathToProjections = promptPath("TYPE PATH TO PROJECTIONS FILE: ");
-        // pathToProjections = "../data/projection_data/bins_50/SPCIBase49_50_bins.root";
+        // pathToProjections = promptPath("TYPE PATH TO PROJECTIONS FILE: ");
+        pathToProjections = "../data/projection_data/bins_50/SPCIBase49_50_bins.root";
 
         nextMenu = new AlgorithmMenu(pathToMeasurements, pathToProjections);
         break;
@@ -249,12 +249,12 @@ TemplateMenu* MLEMMenu::getNextMenu(bool& isQuitOptionSelected){
         break;
 
     case 2:
-        saveDataName = promptFileName();
-        // saveDataName = "../test/Activity.root";
-        maxNumberOfIterations = promptChoice("CHOOSE MAXIMUM NUMBER OF ITERATIONS: ");
-        // maxNumberOfIterations = 10;
-        stopCriterion = promptStopCriterion();
-        // stopCriterion = 0.999;
+        // saveDataName = promptFileName();
+        saveDataName = "../test/Activity.root";
+//        maxNumberOfIterations = promptChoice("CHOOSE MAXIMUM NUMBER OF ITERATIONS: ");
+        maxNumberOfIterations = 130;
+//        stopCriterion = promptStopCriterion();
+        stopCriterion = 0.99999;
 
         reco = new ReconstructionMLEM(this->pathToMeasurements, this->pathToProjections);
         reco->start(maxNumberOfIterations, stopCriterion);

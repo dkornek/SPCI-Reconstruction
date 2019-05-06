@@ -51,6 +51,7 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
         return;
     }
 
+    Double_t minMaxRatio;
     Int_t numberOfIterations = 0;
     auto t1 = std::chrono::steady_clock::now();
 
@@ -61,8 +62,12 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
             break;
         }
 
-        if ((this->deviation >= stopCriterion) && (this->deviation <= 1.0)){
-            break;
+        if (numberOfIterations % 10 == 0){
+            minMaxRatio = 1.0 - this->A_v->GetMinimum() / this->A_v->GetMaximum();
+
+            if (minMaxRatio >= stopCriterion){
+                break;
+            }
         }
     }
 
@@ -317,7 +322,6 @@ void ReconstructionMLEM::calculate(){
     }
 
     // prepare the fraction part of the correction factor
-    this->deviation = this->N_dcb->Integral() / denominator->Integral();
     quotient = (TH3F*)this->N_dcb->Clone("Measurements");
     quotient->Divide(denominator);
 
@@ -333,7 +337,7 @@ void ReconstructionMLEM::calculate(){
         activityInVoxel = currentActivity->GetBinContent(indexX + 1, indexY + 1, indexZ + 1);
 
         // calculate correction factor
-        p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi());
+        p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi())->Clone("Current Probability");
         p_dcb->Multiply(quotient);
         correctionFactor = p_dcb->Integral();
 

@@ -37,7 +37,6 @@ private:
     // ##### MEMBERS #####
 
     Bool_t isCalculationValid;
-    Double_t deviation;
 
     // Measurement Data
     TFile* measurementsFile;

@@ -1,7 +1,7 @@
 // ROOT Macro using the Maximum Likelihood Expectation Maximization algorithm for SPCI-Reconstruction
 
 // author: Dominik Kornek <dominik.kornek@gmail.com>
-// last modified: 19-05-02
+// last modified: 19-05-06
 
 
 #include <iostream>
@@ -124,7 +124,7 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
 
         if (doPlotting && (numberOfIterations % 10 == 0)){
             this->canvas->cd(1);
-            this->A_v->Draw("BOX");
+            this->A_v->Draw("BOX2Z");
 
             this->canvas->cd(2);
             TH2D* projection = (TH2D*)this->A_v->Project3D("yx");
@@ -133,11 +133,15 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
             this->canvas->Update();
         }
 
-        if (numberOfIterations == maxNumberOfIterations){
-            break;
+        if (numberOfIterations % 10 == 0){
+            this->deviation = 1.0 - this->A_v->GetMinimum() / this->A_v->GetMaximum();
+
+            if (this->deviation >= stopCriterion){
+                break;
+            }
         }
 
-        if ((this->deviation >= stopCriterion) && (this->deviation <= 1.0)){
+        if (numberOfIterations == maxNumberOfIterations){
             break;
         }
     }
@@ -148,7 +152,7 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
     std::cout << "\nCalculation time: " << elapsedTime << " seconds\n";
 
     this->canvas->cd(1);
-    this->A_v->Draw("BOX");
+    this->A_v->Draw("BOX2Z");
 
     this->canvas->cd(2);
     TH2D* projection = (TH2D*)this->A_v->Project3D("yx");
@@ -401,7 +405,6 @@ void ReconstructionMLEM::calculate(){
     }
 
     // prepare the fraction part of the correction factor
-    this->deviation = this->N_dcb->Integral() / denominator->Integral();
     quotient = (TH3F*)this->N_dcb->Clone("Measurements");
     quotient->Divide(denominator);
 
@@ -417,7 +420,7 @@ void ReconstructionMLEM::calculate(){
         activityInVoxel = currentActivity->GetBinContent(indexX + 1, indexY + 1, indexZ + 1);
 
         // calculate correction factor
-        p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi());
+        p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi())->Clone("Current Probability");
         p_dcb->Multiply(quotient);
         correctionFactor = p_dcb->Integral();
 
@@ -437,14 +440,16 @@ void mlem(){
     // create an instance of the reconstruction class
 
     // Specify the location of the measurement file
-    TString pathToMeasurements = "../folder/subfolder/*.root";
+//    TString pathToMeasurements = "../folder/subfolder/*.root";
+    TString pathToMeasurements = "../data/measurement_data/bins_50/500_keV/SPCIPos1.root";
 
     // Specify the location of the projections file
-    TString pathToProjection = "../folder/subfolder/*.root";
+//    TString pathToProjection = "../folder/subfolder/*.root";
+    TString pathToProjection = "../data/projection_data/bins_50/SPCIBase49_50_bins.root";
 
     // Reconstruct the image
     Int_t maximumNumberOfIterations = 1000;
-    Double_t stopCriterion = 0.9999;
+    Double_t stopCriterion = 0.999999;
 
     ReconstructionMLEM* reco = new ReconstructionMLEM(pathToMeasurements, pathToProjection);
     reco->start(maximumNumberOfIterations,
