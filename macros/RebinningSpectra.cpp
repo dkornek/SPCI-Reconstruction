@@ -140,7 +140,7 @@ void RebinningProjections(TFile& file, TString path){
     delete newFile;
 }
 
-void RebinningMacro(){
+void RebinningSpectra(){
     int choice;
     cout << "Do you want to rebin the measurements (1) or the base file (2)?: ";
     cin >> choice;

@@ -5,12 +5,14 @@
 
 
 #include <iostream>
-#include <chrono>
 
 #include <TROOT.h>
 #include <TFile.h>
 #include <TKey.h>
+#include <TH2.h>
 #include <TH3.h>
+#include <TBenchmark.h>
+#include <TCanvas.h>
 
 
 // ##### RECONSTRUCTION #####
@@ -18,7 +20,7 @@ class ReconstructionMLEM{
 public:
     ReconstructionMLEM(TString pathToMeasurements, TString pathToProjections);
     ~ReconstructionMLEM();
-    void start(Int_t maxNumberOfIterations, Double_t stopCriterion, Bool_t doPlotting);
+    void start(Int_t maxNumberOfIterations, Bool_t doPlotting);
 
     // Activity distribution
     TH3F* A_v;
@@ -44,7 +46,6 @@ private:
 
     TCanvas* canvas;
     Bool_t isCalculationValid;
-    Double_t deviation;
 
     // Measurement Data
     TFile* measurementsFile;
@@ -108,7 +109,7 @@ ReconstructionMLEM::~ReconstructionMLEM(){
     delete this->projectionsFile;
 }
 
-void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriterion, Bool_t doPlotting){
+void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Bool_t doPlotting){
     // execute the calculation
 
     this->checkValidity();
@@ -116,9 +117,10 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
         return;
     }
 
+    TBenchmark b;
     Int_t numberOfIterations = 0;
-    auto t1 = std::chrono::steady_clock::now();
 
+    b.Start("stats");
     for (;;++numberOfIterations){
         this->calculate();
 
@@ -133,23 +135,15 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
             this->canvas->Update();
         }
 
-        if (numberOfIterations % 10 == 0){
-            this->deviation = 1.0 - this->A_v->GetMinimum() / this->A_v->GetMaximum();
-
-            if (this->deviation >= stopCriterion){
-                break;
-            }
-        }
-
         if (numberOfIterations == maxNumberOfIterations){
             break;
         }
     }
-    auto t2 = std::chrono::steady_clock::now();
-    auto elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
+    b.Stop("stats");
 
+    // Inform user
     std::cout << "Image reconstruction done. Steps: " << numberOfIterations << "\n";
-    std::cout << "\nCalculation time: " << elapsedTime << " seconds\n";
+    std::cout << "\nCalculation time: " << b.GetRealTime("stats") << " seconds\n";
 
     this->canvas->cd(1);
     this->A_v->Draw("BOX2Z");
@@ -157,7 +151,6 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
     this->canvas->cd(2);
     TH2D* projection = (TH2D*)this->A_v->Project3D("yx");
     projection->Draw("COLZ");
-
     this->canvas->Update();
 }
 
@@ -181,15 +174,15 @@ void ReconstructionMLEM::getDetectorIndices(TString nameOfSpectrum, Int_t &d, In
     // extract index of both the detectors from the name of the spectrum
 
     d = ((TString)nameOfSpectrum(0, 2)).Atoi();
-    c = ((TString)nameOfSpectrum(2, 4)).Atoi();
+    c = ((TString)nameOfSpectrum(2, 2)).Atoi();
 }
 
 void ReconstructionMLEM::getImageSpaceIndices(TString titleOfVoxel, Int_t &x, Int_t &y, Int_t &z){
     // extraxct location in image space from the title (=name of directory) of the voxel v
 
-    x = ((TString)titleOfVoxel(1)).Atoi();
-    y = ((TString)titleOfVoxel(3)).Atoi();
-    z = ((TString)titleOfVoxel(5)).Atoi();
+    x = ((TString)titleOfVoxel(1, 1)).Atoi();
+    y = ((TString)titleOfVoxel(3, 1)).Atoi();
+    z = ((TString)titleOfVoxel(5, 1)).Atoi();
 }
 
 void ReconstructionMLEM::fillN_dcb(){
@@ -204,7 +197,6 @@ void ReconstructionMLEM::fillN_dcb(){
     this->nextS_dcMeasurements->Reset();
     while ((this->keyS_dcMeasurements = (TKey*)this->nextS_dcMeasurements->Next())){
         nameOfS_dc = this->keyS_dcMeasurements->GetName();
-        // get detector indices
         this->getDetectorIndices(nameOfS_dc, detectorD, detectorC);
 
         // get spectrum
@@ -325,7 +317,7 @@ void ReconstructionMLEM::createP_dcbv(){
             S_dc = (TH1F*)dirOfVoxel->Get(nameOfS_dc);
             emissionsInVoxel += S_dc->Integral();
 
-            this->getDetectorIndices(nameOfS_dc(3, 7), detectorD, detectorC);
+            this->getDetectorIndices(nameOfS_dc(3, 4), detectorD, detectorC);
             for (Int_t bin = 1; bin <= this->NbinsProjections; ++bin){
                 p_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
                                      S_dc->GetBinContent(bin));
@@ -428,6 +420,7 @@ void ReconstructionMLEM::calculate(){
         // faster method
         p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi());
         correctionFactor = 0.0;
+
         for (Int_t d = 1; d <= this->numberOfDetectors; ++d){
             for (Int_t c = 1; c <= this->numberOfDetectors; ++c){
                 for (Int_t bin = 1; bin <= this->NbinsProjections; ++bin){
@@ -446,33 +439,35 @@ void ReconstructionMLEM::calculate(){
     delete currentActivity;
 }
 
-
 // ##### ROOT #####
-void mlem(){
+void MLEM(){
     // create an instance of the reconstruction class
 
     // Specify the location of the measurement file
-//    TString pathToMeasurements = "../folder/subfolder/*.root";
-    TString pathToMeasurements = "../data/measurement_data/bins_50/500_keV/SPCIPos1.root";
+    TString pathToMeasurements = "../folder/subfolder/*.root";
+//    pathToMeasurements = "../data/measurement_data/SPCIBase49/bins_50/SourcePos0.root";
+//    pathToMeasurements = "../data/measurement_data/SPCIBase49/bins_50/SourcePos1.root";
+//    pathToMeasurements = "../data/measurement_data/SPCIBase49/bins_50/SourcePos24.root";
+//    pathToMeasurements = "../data/measurement_data/SPCIBase49/bins_50/SourcePos48.root";
+//    pathToMeasurements = "../data/measurement_data/SPCIBase49/bins_50/SourcePos6.root";
+//    pathToMeasurements = "../data/measurement_data/SPCIBase49/bins_50/SourcePos0+24+26+36.root";
+    pathToMeasurements = "../data/measurement_data/SPCIBase49/bins_50/SourceCross.root";
 
     // Specify the location of the projections file
-//    TString pathToProjection = "../folder/subfolder/*.root";
-    TString pathToProjection = "../data/projection_data/bins_50/SPCIBase49_50_bins.root";
+    TString pathToProjection = "../folder/subfolder/*.root";
+    pathToProjection = "../data/projection_data/bins_50/SPCIBase49.root";
 
     // Reconstruct the image
-    Int_t maximumNumberOfIterations = 10;
-    Double_t stopCriterion = 0.9999999999999999;
+    Int_t maximumNumberOfIterations = 1000;
 
     ReconstructionMLEM* reco = new ReconstructionMLEM(pathToMeasurements, pathToProjection);
-    reco->start(maximumNumberOfIterations,
-                stopCriterion,
-                kFALSE);  // Plotting option
+    reco->start(maximumNumberOfIterations, kTRUE);
 }
 
 // ##### COMPILE FILE #####
 #ifndef __CINT__
 int main(){
-    mlem();
+    MLEM();
     return 0;
 }
 #endif
