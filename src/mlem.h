@@ -12,7 +12,7 @@ class ReconstructionMLEM{
 public:
     ReconstructionMLEM(TString pathToMeasurements, TString pathToProjections);
     ~ReconstructionMLEM();
-    void start(Int_t maxNumberOfIterations, Double_t stopCriterion);
+    void start(Int_t maxNumberOfIterations);
 
     // Activity distribution
     TH3F* A_v;

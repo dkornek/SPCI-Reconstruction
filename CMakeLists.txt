@@ -13,9 +13,16 @@ target_compile_options(SPCI-Reconstruction PUBLIC -pthread -std=c++11
     -m64 -I/opt/root/root-6.12.04/include -L/opt/root/root-6.12.04/lib
     -lGui -lCore -lImt -lRIO -lNet -lHist -lGraf -lGraf3d -lGpad -lTree -lTreePlayer -lRint -lPostscript
     -lMatrix -lPhysics -lMathCore -lThread -lMultiProc -pthread -lm -ldl -rdynamic
-    -Wall -Wextra -Wfloat-conversion)
+    -Wall -Wextra -Wfloat-conversion -fopenmp)
 
 ##### DEPENDENCIES #####
+find_package(OpenMP)
+if (OPENMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
+
 find_package(Boost 1.60.0)
 target_link_libraries(SPCI-Reconstruction PUBLIC ${Boost_LIBRARIES})
 

@@ -3,7 +3,7 @@
 #include "mlem.h"
 
 #include <iostream>
-#include <chrono>
+#include <TBenchmark.h>
 
 // ##### PUBLIC FUNCTIONS #####
 ReconstructionMLEM::ReconstructionMLEM(TString pathToMeasurements, TString pathToProjections){
@@ -43,7 +43,7 @@ ReconstructionMLEM::~ReconstructionMLEM(){
     delete this->projectionsFile;
 }
 
-void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriterion){
+void ReconstructionMLEM::start(Int_t maxNumberOfIterations){
     // execute the calculation
 
     this->checkValidity();
@@ -51,31 +51,22 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stopCriteri
         return;
     }
 
-    Double_t minMaxRatio;
+    TBenchmark b;
     Int_t numberOfIterations = 0;
-    auto t1 = std::chrono::steady_clock::now();
 
+    b.Start("stats");
     for (;;++numberOfIterations){
         this->calculate();
 
         if (numberOfIterations == maxNumberOfIterations){
             break;
         }
-
-        if (numberOfIterations % 10 == 0){
-            minMaxRatio = 1.0 - this->A_v->GetMinimum() / this->A_v->GetMaximum();
-
-            if (minMaxRatio >= stopCriterion){
-                break;
-            }
-        }
     }
+    b.Stop("stats");
 
-    auto t2 = std::chrono::steady_clock::now();
-    auto elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
-
+    // Inform user
     std::cout << "Image reconstruction done. Steps: " << numberOfIterations << "\n";
-    std::cout << "Calculation time: " << elapsedTime << " seconds\n";
+    std::cout << "\nCalculation time: " << b.GetRealTime("stats") << " seconds\n";
 }
 
 // ##### PRIVATE FUNCTIONS #####
@@ -98,15 +89,15 @@ void ReconstructionMLEM::getDetectorIndices(TString nameOfSpectrum, Int_t &d, In
     // extract index of both the detectors from the name of the spectrum
 
     d = ((TString)nameOfSpectrum(0, 2)).Atoi();
-    c = ((TString)nameOfSpectrum(2, 4)).Atoi();
+    c = ((TString)nameOfSpectrum(2, 2)).Atoi();
 }
 
 void ReconstructionMLEM::getImageSpaceIndices(TString titleOfVoxel, Int_t &x, Int_t &y, Int_t &z){
     // extraxct location in image space from the title (=name of directory) of the voxel v
 
-    x = ((TString)titleOfVoxel(1)).Atoi();
-    y = ((TString)titleOfVoxel(3)).Atoi();
-    z = ((TString)titleOfVoxel(5)).Atoi();
+    x = ((TString)titleOfVoxel(1, 1)).Atoi();
+    y = ((TString)titleOfVoxel(3, 1)).Atoi();
+    z = ((TString)titleOfVoxel(5, 1)).Atoi();
 }
 
 void ReconstructionMLEM::fillN_dcb(){
@@ -242,7 +233,7 @@ void ReconstructionMLEM::createP_dcbv(){
             S_dc = (TH1F*)dirOfVoxel->Get(nameOfS_dc);
             emissionsInVoxel += S_dc->Integral();
 
-            this->getDetectorIndices(nameOfS_dc(3, 7), detectorD, detectorC);
+            this->getDetectorIndices(nameOfS_dc(3, 4), detectorD, detectorC);
             for (Int_t bin = 1; bin <= this->NbinsProjections; ++bin){
                 p_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
                                      S_dc->GetBinContent(bin));
@@ -345,6 +336,8 @@ void ReconstructionMLEM::calculate(){
         // faster method
         p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi());
         correctionFactor = 0.0;
+
+        #pragma omp parallel for reduction(+: correctionFactor)
         for (Int_t d = 1; d <= this->numberOfDetectors; ++d){
             for (Int_t c = 1; c <= this->numberOfDetectors; ++c){
                 for (Int_t bin = 1; bin <= this->NbinsProjections; ++bin){
