@@ -162,10 +162,10 @@ TemplateMenu* ReconstructionMenu::getNextMenu(bool& isQuitOptionSelected){
 
     case 2:
         // pathToMeasurements = promptPath("TYPE PATH TO MEASUREMENTS FILE: ");
-        pathToMeasurements = "../data/measurement_data/bins_50/500_keV/SPCIPos1.root";
+        pathToMeasurements = "../data/Measurements/SPCIBase441/Bins50/SourceSquare.root";
 
         // pathToProjections = promptPath("TYPE PATH TO PROJECTIONS FILE: ");
-        pathToProjections = "../data/projection_data/bins_50/SPCIBase49_50_bins.root";
+        pathToProjections = "../data/SystemMatrix/Bins50/SPCIBase441.root";
 
         nextMenu = new AlgorithmMenu(pathToMeasurements, pathToProjections);
         break;
@@ -239,7 +239,7 @@ TemplateMenu* MLEMMenu::getNextMenu(bool& isQuitOptionSelected){
 
     TString saveDataName;
     int maxNumberOfIterations;
-    double stopCriterion;
+//    double stopCriterion;
     ReconstructionMLEM* reco;
     ActivityDistribution* activity;
 
@@ -252,12 +252,12 @@ TemplateMenu* MLEMMenu::getNextMenu(bool& isQuitOptionSelected){
         // saveDataName = promptFileName();
         saveDataName = "../test/Activity.root";
 //        maxNumberOfIterations = promptChoice("CHOOSE MAXIMUM NUMBER OF ITERATIONS: ");
-        maxNumberOfIterations = 130;
+        maxNumberOfIterations = 300;
 //        stopCriterion = promptStopCriterion();
-        stopCriterion = 0.99999;
+//        stopCriterion = 0.999999999;
 
         reco = new ReconstructionMLEM(this->pathToMeasurements, this->pathToProjections);
-        reco->start(maxNumberOfIterations, stopCriterion);
+        reco->start(maxNumberOfIterations);
 
         activity = new ActivityDistribution(reco->A_v, saveDataName);
         activity->save3DHistogram();

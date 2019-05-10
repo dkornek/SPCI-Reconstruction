@@ -35,18 +35,17 @@ TList* createEmptySpectraList(TFile* f){
              rangeMin, rangeMax);
 
     TList* list = new TList();
-    TH1F* spectrum;
-    TString nameOfSpectrum;
-    TString description;
-
     for (Int_t d = 0; d < numberOfDetectors; ++d){
-        for (Int_t c = 0; c < numberOfDetectors; ++c){
+        for (Int_t c = d + 1; c < numberOfDetectors; ++c){
 
             if (d != c){
+                TString nameOfSpectrum;
                 nameOfSpectrum.Form("%02i%02i", d, c);
+
+                TString description;
                 description.Form("Sum energy spectrum Die %i with Die %i", d, c);
-                spectrum = new TH1F(nameOfSpectrum, description,
-                                    numberOfBins, rangeMin, rangeMax);
+                TH1F* spectrum = new TH1F(nameOfSpectrum, description,
+                                          numberOfBins, rangeMin, rangeMax);
                 list->AddLast(spectrum);
             }
         }
@@ -57,40 +56,34 @@ TList* createEmptySpectraList(TFile* f){
 
 void addSpectraToList(TFile* f, TList* l, std::vector<Int_t> loc, std::vector<Double_t> w){
     // Add all spectra of specified voxels to the measurements files
-    // voxel information
-    TDirectory* directoryOfVoxel;
-    TString nameOfVoxel;
-    TH1F* spectrumInVoxel;
-
-    // spectra information
-    TString nameOfSpectrum;
-    TH1F* spectrum;
 
     TIter nextVoxel(f->GetListOfKeys());
     TKey* keyVoxel;
     while ((keyVoxel = (TKey*)nextVoxel())){
         // iterate through every voxel
-        nameOfVoxel = keyVoxel->GetName();
+        TString nameOfVoxel = keyVoxel->GetName();
 
         for (Int_t n = 0; n <= loc.size(); ++n){
             // iterate through all wanted sources
 
             if (nameOfVoxel.Atoi() == loc[n]){
-                directoryOfVoxel = (TDirectory*)f->Get(nameOfVoxel);
+                TDirectory* directoryOfVoxel = (TDirectory*)f->Get(nameOfVoxel);
 
                 TIter nextSpectrum(directoryOfVoxel->GetListOfKeys());
                 TKey* keySpectrum;
                 while ((keySpectrum = (TKey*)nextSpectrum())){
                     // add all spectra of wanted source to the measurements spectra
-                    nameOfSpectrum = keySpectrum->GetName();
+                    TString nameOfSpectrum = keySpectrum->GetName();
 
                     // get spectrum of specified voxel
-                    spectrumInVoxel = (TH1F*)directoryOfVoxel->Get(nameOfSpectrum)->Clone("");
+                    TH1F* spectrumInVoxel = (TH1F*)directoryOfVoxel->Get(nameOfSpectrum)->Clone("");
                     spectrumInVoxel->Scale(w[n]);
 
                     // get corresponding spectrum in measurements file
-                    spectrum = (TH1F*)l->FindObject((TString)nameOfSpectrum(3, 4));
+                    TH1F* spectrum = (TH1F*)l->FindObject((TString)nameOfSpectrum(3, 4));
                     spectrum->Add(spectrumInVoxel);
+
+                    delete spectrumInVoxel;
                 }
             }
         }
@@ -100,7 +93,7 @@ void addSpectraToList(TFile* f, TList* l, std::vector<Int_t> loc, std::vector<Do
 void CreateSource(){
 
     // Open base file = system matrix
-    TString pathToBase = "../data/projection_data/bins_50/SPCIBase49.root";
+    TString pathToBase = "../../data/SystemMatrix/Bins50/SPCIBase441.root";
     TFile* input = new TFile(pathToBase, "READ");
     if (!input->IsOpen()){
         std::cout << "Input file not found!\n";
@@ -108,7 +101,7 @@ void CreateSource(){
     }
 
     // Create source file = simulated measurements
-    TFile* output = new TFile("../data/measurement_data/SPCIBase49/bins_50/SourceCross.root", "RECREATE");
+    TFile* output = new TFile("../../data/Measurements/SPCIBase441/Bins50/SourceSquare.root", "RECREATE");
     if (!output->IsOpen()){
         std::cout << "Output file could not be created!\n";
         return;
@@ -118,8 +111,8 @@ void CreateSource(){
     TList* spectraList = createEmptySpectraList(input);
 
     // point source locations
-    std::vector<Int_t> sourceLocations =    { 3, 10, 17, 24, 31, 38, 45, 21, 22, 23, 25, 26, 27 };
-    std::vector<Double_t> weights =         { 8,  6,  4,  1,  4,  6,  8,  8,  6,  4,  4,  6,  8 };
+    std::vector<Int_t> sourceLocations =    { 88, 100, 340, 352 };
+    std::vector<Double_t> weights =         {  1,   2,   3,   4 };
 
     if (sourceLocations.size() != weights.size()){
         std::cout << "Number of locations and weights do not match!\n";

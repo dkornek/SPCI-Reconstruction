@@ -80,6 +80,8 @@ void RebinningMeasurements(TFile& file, TString path){
         spectrum = (TH1F*)file.Get(key->GetName());
         spectrum->Rebin(rebinningFactor);
         spectrum->Write(key->GetName());
+
+        delete spectrum;
     }
 
     newFile->Write();
@@ -106,6 +108,8 @@ void RebinningProjections(TFile& file, TString path){
             spectrum = (TH1F*)spectra->Get(keyVoxel->GetName());
             nBins += spectrum->GetNbinsX();
             ++nSpectra;
+
+            delete spectrum;
         }
     }
 
@@ -132,6 +136,8 @@ void RebinningProjections(TFile& file, TString path){
             spectrum = (TH1F*)spectra->Get(keyVoxel->GetName());
             spectrum->Rebin(rebinningFactor);
             spectrum->Write(keyVoxel->GetName());
+
+            delete spectrum;
         }
     }
 
