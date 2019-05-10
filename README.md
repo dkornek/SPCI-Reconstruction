@@ -16,7 +16,9 @@ Use these instructions to get a copy of this repo on your local machine for rese
 
 ### Prerequisites
 You need:
-* [**ROOT**](https://root.cern.ch/) -- Use this [guide](https://root.cern.ch/root/html534/guides/users-guide/InstallandBuild.html) to get ROOT running on your system.
+* [**ROOT**](https://root.cern.ch/root/html534/guides/users-guide/InstallandBuild.html) -- data analysis framework
+* [**boost**](https://www.boost.org/doc/libs/1_66_0/more/getting_started/unix-variants.html) -- C++ libraries
+
 
 ### Installing
 To clone this repo, use: `$ git clone https://github.com/dkornek/SPCI-Reconstruction.git`
