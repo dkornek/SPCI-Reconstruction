@@ -2,6 +2,7 @@
 // image reconstruction using maximum likelihood expectation maximization algorithm
 
 #pragma once
+#include <vector>
 #include <TROOT.h>
 #include <TFile.h>
 #include <TKey.h>
@@ -33,6 +34,8 @@ private:
 
     // ##### CALCULATION FUNCTIONS #####
     void calculate();
+    void projection(TH3F& p);
+    void backprojection(TH3F& p, TH3F& bp);
 
     // ##### MEMBERS #####
 
@@ -52,6 +55,8 @@ private:
     // Probabilities
     TFile* projectionsFile;
     TList* p_dcbv;
+    TList* p_dcbvPrime;  // p_dcbv * N_dcb
+    std::vector<Double_t> p_dcbvSum;
 
     Int_t NbinsProjections;
 

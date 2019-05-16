@@ -59,11 +59,11 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations){
 
     b.Start("stats");
     for (;;++numberOfIterations){
-        this->calculate();
-
         if (numberOfIterations == maxNumberOfIterations){
             break;
         }
+
+        this->calculate();
     }
     b.Stop("stats");
 
@@ -131,8 +131,10 @@ void ReconstructionMLEM::fillN_dcb(){
 
         // get spectrum
         TH1F* S_dc = (TH1F*)this->measurementsFile->Get(nameOfS_dc);
+        S_dc->Scale(1.0 / S_dc->Integral());  // faster convergence
 
         // fill N_dcb
+        #pragma omp parallel for
         for (Int_t bin = 1; bin <= this->NbinsMeasurements; ++bin){
             this->N_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
                                        S_dc->GetBinContent(bin));
@@ -203,6 +205,7 @@ void ReconstructionMLEM::createP_dcbv(){
     // create list of 3d histograms containing the probabilities for each voxel
 
     this->p_dcbv = new TList();
+    this->p_dcbvPrime = new TList();
 
     // get number of bins
     TString nameOfLastVoxel = this->projectionsFile->GetListOfKeys()->Last()->GetName();
@@ -214,7 +217,6 @@ void ReconstructionMLEM::createP_dcbv(){
     // iterate through all voxels v
     this->nextVoxel->Reset();
     while ((this->keyVoxel = (TKey*)this->nextVoxel->Next())){
-        Double_t emissionsInVoxel = 0.0;
         TString nameOfVoxel = this->keyVoxel->GetName();
 
         TString internalName;
@@ -229,17 +231,18 @@ void ReconstructionMLEM::createP_dcbv(){
                                this->NbinsProjections, 0, this->NbinsProjections);
 
         TDirectory* dirOfVoxel = (TDirectory*)this->projectionsFile->Get(nameOfVoxel);
-
-        // iterate through all spectra in voxel v
         TIter nextS_dc(dirOfVoxel->GetListOfKeys());
         while ((this->keyS_dcVoxel = (TKey*)nextS_dc())){
+            // iterate through all spectra in voxel v
             TString nameOfS_dc = this->keyS_dcVoxel->GetName();
             TH1F* S_dc = (TH1F*)dirOfVoxel->Get(nameOfS_dc);
-            emissionsInVoxel += S_dc->Integral();
+            S_dc->Scale(1.0 / S_dc->Integral());  // faster convergence
 
             Int_t detectorD;
             Int_t detectorC;
             this->getDetectorIndices(nameOfS_dc(3, 4), detectorD, detectorC);
+
+            #pragma omp parallel for
             for (Int_t bin = 1; bin <= this->NbinsProjections; ++bin){
                 p_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
                                      S_dc->GetBinContent(bin));
@@ -248,8 +251,13 @@ void ReconstructionMLEM::createP_dcbv(){
             delete S_dc;
         }
 
-        p_dcb->Scale(1.0 / emissionsInVoxel);
         this->p_dcbv->AddLast(p_dcb);
+        this->p_dcbvSum.push_back(p_dcb->Integral());
+
+        TH3F* p_dcbPrime = (TH3F*)p_dcb->Clone("Prime");
+        p_dcbPrime->Multiply(this->N_dcb);
+        this->p_dcbvPrime->AddLast(p_dcbPrime);
+
         delete dirOfVoxel;
     }
 }
@@ -282,77 +290,89 @@ void ReconstructionMLEM::calculate(){
     // execute the maximum likelihood expectation maximization algorithm
     // to calculate the activity distribution A (=A_v)
 
-    TH3F* currentActivity = (TH3F*)this->A_v->Clone("Current Activity");
-
-    // get the measurements
-    TH3F* quotient = (TH3F*)this->N_dcb->Clone("Measurements");
-
-    // calculate the denominator = backprojection
-    TH3F* denominator = new TH3F("denom", "Denominator for correction factor",
+    // calculate the backprojection
+    TH3F* projections = new TH3F("projections", "Projections",
                                  this->numberOfDetectors, 0, this->numberOfDetectors,
                                  this->numberOfDetectors, 0, this->numberOfDetectors,
                                  this->NbinsProjections, 0, this->NbinsProjections);
+    this->projection(*projections);
 
-    this->nextVoxel->Reset();
-    while ((this->keyVoxel = (TKey*)this->nextVoxel->Next())){
-        Int_t indexX;
-        Int_t indexY;
-        Int_t indexZ;
+    // calculate the backprojection
+    TH3F* backprojections = new TH3F("backprojections", "Backprojections",
+                                     this->A_v->GetNbinsX(), 0, this->A_v->GetNbinsX(),
+                                     this->A_v->GetNbinsY(), 0, this->A_v->GetNbinsY(),
+                                     this->A_v->GetNbinsZ(), 0, this->A_v->GetNbinsZ());
+    this->backprojection(*projections, *backprojections);
 
-        // get activity A_v in voxel v
-        TString nameOfVoxel = this->keyVoxel->GetName();
-        TString titleOfVoxel = this->keyVoxel->GetTitle();
-        this->getImageSpaceIndices(titleOfVoxel, indexX, indexY, indexZ);
-        Double_t activityInVoxel = currentActivity->GetBinContent(indexX + 1, indexY + 1, indexZ + 1);
+    // calculate new activity
+    this->A_v->Multiply(backprojections);
 
-        // get p_dcb for voxel v
-        TH3F* p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi());
+    delete backprojections;
+    delete projections;
+}
 
-        // multiply them and add them to the denominator
-        denominator->Add(p_dcb, activityInVoxel);
-    }
+void ReconstructionMLEM::projection(TH3F& p){
 
-    // calculate the ratio of backprojection and measurements
-    quotient->Divide(denominator);
-    delete denominator;
+    Int_t voxel = 0;
+    for (Int_t z = 1; z <= this->A_v->GetNbinsZ(); ++z){
+        for (Int_t y = 1; y <= this->A_v->GetNbinsY(); ++y){
+            for (Int_t x = 1; x <= this->A_v->GetNbinsX(); ++x){
 
-    // calculate new activity distribution
-    this->nextVoxel->Reset();
-    while ((this->keyVoxel = (TKey*)this->nextVoxel->Next())){
-        Int_t indexX;
-        Int_t indexY;
-        Int_t indexZ;
+                TH3F* p_dcb = (TH3F*)this->p_dcbv->At(voxel);
+                Double_t activityInVoxel = this->A_v->GetBinContent(x, y, z);
+                p.Add(p_dcb, activityInVoxel);
 
-        // get activity A_v in voxel v
-        TString nameOfVoxel = this->keyVoxel->GetName();
-        TString titleOfVoxel = this->keyVoxel->GetTitle();
-        this->getImageSpaceIndices(titleOfVoxel, indexX, indexY, indexZ);
-        Double_t activityInVoxel = currentActivity->GetBinContent(indexX + 1, indexY + 1, indexZ + 1);
-
-        // calculate correction factor
-        // costs memory + slow
-        // TH3F* p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi())->Clone("Current Probability");
-        // p_dcb->Multiply(quotient);
-        // Double_t correctionFactor = p_dcb->Integral();
-
-        // faster method
-        TH3F* p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi());
-        Double_t correctionFactor = 0.0;
-
-        #pragma omp parallel for reduction(+: correctionFactor)
-        for (Int_t d = 1; d <= this->numberOfDetectors; ++d){
-            for (Int_t c = 1; c <= this->numberOfDetectors; ++c){
-                for (Int_t bin = 1; bin <= this->NbinsProjections; ++bin){
-                    correctionFactor += p_dcb->GetBinContent(d, c, bin) * quotient->GetBinContent(d, c, bin);
-                }
+                ++voxel;
             }
         }
-
-        // calculate new activity A_v
-        this->A_v->SetBinContent(indexX + 1, indexY + 1, indexZ + 1,
-                                 activityInVoxel * correctionFactor);
     }
+}
 
-    delete quotient;
-    delete currentActivity;
+void ReconstructionMLEM::backprojection(TH3F& p, TH3F& bp){
+    // create TH3 for activity correction factors
+
+    Int_t voxel = 0;
+    Double_t lowerThreshold = 0.0001;  // heavily dependent of the real activity distribution
+                                       // needs adjustment
+
+    this->nextVoxel->Reset();
+    while ((this->keyVoxel = (TKey*)this->nextVoxel->Next())){
+
+        Int_t indexX;
+        Int_t indexY;
+        Int_t indexZ;
+        this->getImageSpaceIndices(this->keyVoxel->GetTitle(), indexX, indexY, indexZ);
+
+        Double_t correctionFactor = 0.0;
+        Double_t activityInVoxel = this->A_v->GetBinContent(indexX + 1, indexY + 1, indexZ + 1);
+
+        // only iterate over voxels with enough activity content --> save computing time
+        if (activityInVoxel >= lowerThreshold) {
+            TH3F* p_dcbPrime = (TH3F*)this->p_dcbvPrime->At(voxel);
+
+            #pragma omp parallel for reduction(+: correctionFactor)
+            for (Int_t d = 1; d <= this->numberOfDetectors; ++d){
+                for (Int_t c = 1; c <= this->numberOfDetectors; ++c){
+                    for (Int_t bin = 1; bin <= this->NbinsProjections; ++bin){
+
+                        Double_t N_dcbPrime = p.GetBinContent(d, c, bin);
+                        if (N_dcbPrime != 0) {
+                            correctionFactor += p_dcbPrime->GetBinContent(d, c, bin) / N_dcbPrime;
+                        }
+                    }
+                }
+            }
+
+            correctionFactor = correctionFactor / this->p_dcbvSum[voxel];
+            correctionFactor = std::pow(correctionFactor, 1.3);  // accelerate the convergence
+
+        } else{
+            correctionFactor = 1.0;
+        }
+
+        bp.SetBinContent(indexX + 1, indexY + 1, indexZ + 1,
+                        correctionFactor);
+
+        ++voxel;
+    }
 }

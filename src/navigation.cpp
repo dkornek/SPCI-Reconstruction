@@ -252,7 +252,7 @@ TemplateMenu* MLEMMenu::getNextMenu(bool& isQuitOptionSelected){
         // saveDataName = promptFileName();
         saveDataName = "../test/Activity.root";
 //        maxNumberOfIterations = promptChoice("CHOOSE MAXIMUM NUMBER OF ITERATIONS: ");
-        maxNumberOfIterations = 300;
+        maxNumberOfIterations = 100;
 //        stopCriterion = promptStopCriterion();
 //        stopCriterion = 0.999999999;
 

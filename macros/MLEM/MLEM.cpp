@@ -5,6 +5,7 @@
 
 
 #include <iostream>
+#include <vector>
 
 #include <TROOT.h>
 #include <TFile.h>
@@ -41,6 +42,8 @@ private:
 
     // ##### CALCULATION FUNCTIONS #####
     void calculate();
+    void projection(TH3F& p);
+    void backprojection(TH3F& p, TH3F& bp);
 
     // ##### MEMBERS #####
 
@@ -61,17 +64,14 @@ private:
     // Probabilities
     TFile* projectionsFile;
     TList* p_dcbv;
+    TList* p_dcbvPrime;  // p_dcbv * N_dcb
+    std::vector<Double_t> p_dcbvSum;
 
     Int_t NbinsProjections;
 
     TIter* nextVoxel;
     TKey* keyVoxel;
     TKey* keyS_dcVoxel;
-
-    // Aitkin
-    TH3F* A_v_n;
-    TH3F* A_v_n1;
-    TH3F* A_v_n2;
 };
 
 // ##### PUBLIC FUNCTIONS #####
@@ -85,18 +85,28 @@ ReconstructionMLEM::ReconstructionMLEM(TString pathToMeasurements, TString pathT
     this->openFile("PROJECTION", pathToProjections);
     this->nextVoxel = new TIter(this->projectionsFile->GetListOfKeys());
 
+    TBenchmark b;
     // prepare the measurement data N_dcb
     // N_dcb = number of events in detector pair (d, c) separated by bins
+    b.Start("N_dcb");
     this->createN_dcb();
+    b.Stop("N_dcb");
+    std::cout << "\nN_dcb Creation Time: " << b.GetRealTime("N_dcb") << " seconds\n";
 
     // prepare the probabilities p_dcbv
     // p_dcbv = voxel v specific probabilitiy to contribute one count to N_dcb;
     // there are v 3d histograms p_dcb in the list p_dcbv
+    b.Start("p_dcb");
     this->createP_dcbv();
+    b.Stop("p_dcb");
+    std::cout << "\np_dcb Creation Time: " << b.GetRealTime("p_dcb") << " seconds\n";
 
     // prepare the homogeneous activity distribution A_v
     // A_v = activity in voxel v of the image space
+    b.Start("A_v");
     this->createA_v();
+    b.Stop("A_v");
+    std::cout << "\nA_v Creation Time: " << b.GetRealTime("A_v") << " seconds\n";
 
     // show the image reconstruction process
     this->canvas = new TCanvas("activity", "Reconstruction", 10, 10, 1000, 450);
@@ -128,13 +138,12 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Bool_t doPlotting){
     }
 
     TBenchmark b;
-    Int_t numberOfIterations = 0;
-
     b.Start("stats");
-    for (;;++numberOfIterations){
+    for (Int_t i = 0; i < maxNumberOfIterations ; ++i){
+
         this->calculate();
 
-        if (doPlotting && (numberOfIterations % 10 == 0)){
+        if (doPlotting && (i % 10 == 0)){
             this->canvas->cd(1);
             this->A_v->Draw("BOX2Z");
 
@@ -145,59 +154,12 @@ void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Bool_t doPlotting){
             this->canvas->Update();
             delete projection;
         }
-
-        if (numberOfIterations == maxNumberOfIterations){
-            break;
-        }
-
-        // Aitkin acceleration
-        if (numberOfIterations % 3 == 0){
-            this->A_v_n = (TH3F*)this->A_v->Clone("n");
-        }
-
-        if (numberOfIterations % 3 == 1){
-            this->A_v_n1 = (TH3F*)this->A_v->Clone("n+1");
-        }
-
-        if (numberOfIterations % 3 == 2){
-            this->A_v_n2 = (TH3F*)this->A_v->Clone("n+2");
-
-            std::cout << this->A_v_n->GetMaximum() << " " << this->A_v_n1->GetMaximum() << " " << this->A_v_n2->GetMaximum() << "\n";
-
-            TH3F* denominator = (TH3F*)this->A_v_n2->Clone("aitkindenom");
-            denominator->Add(this->A_v_n1, -2.0);
-            denominator->Add(this->A_v_n);
-            std::cout << denominator->GetMaximum() << "\n";
-
-            TH3F* numerator = (TH3F*)this->A_v_n2->Clone("aitkinnum");
-            numerator->Add(this->A_v_n1, -1.0);
-            numerator->Multiply(numerator);
-            std::cout << numerator->GetMaximum() << "\n";
-
-            numerator->Divide(denominator);
-            this->A_v_n2->Add(numerator, -1.0);
-
-
-
-//            delete this->A_v;
-//            this->A_v = (TH3F*)this->A_v_n2->Clone("A_v");
-//            this->A_v->Add(numerator, -1.0);
-
-
-//            delete denominator;
-//            delete numerator;
-
-            delete this->A_v_n;
-            delete this->A_v_n1;
-            delete this->A_v_n2;
-        }
-
     }
     b.Stop("stats");
 
     // Inform user
-    std::cout << "Image reconstruction done. Steps: " << numberOfIterations << "\n";
-    std::cout << "\nCalculation time: " << b.GetRealTime("stats") << " seconds\n";
+    std::cout << "Image reconstruction done. Steps: " << maxNumberOfIterations << "\n";
+    std::cout << "\nCalculation Time: " << b.GetRealTime("stats") << " seconds\n";
 
     this->canvas->cd(1);
     this->A_v->Draw("BOX2Z");
@@ -267,6 +229,7 @@ void ReconstructionMLEM::fillN_dcb(){
 
         // get spectrum
         TH1F* S_dc = (TH1F*)this->measurementsFile->Get(nameOfS_dc);
+        S_dc->Scale(1.0 / S_dc->Integral());  // faster convergence
 
         // fill N_dcb
         for (Int_t bin = 1; bin <= this->NbinsMeasurements; ++bin){
@@ -339,6 +302,7 @@ void ReconstructionMLEM::createP_dcbv(){
     // create list of 3d histograms containing the probabilities for each voxel
 
     this->p_dcbv = new TList();
+    this->p_dcbvPrime = new TList();
 
     // get number of bins
     TString nameOfLastVoxel = this->projectionsFile->GetListOfKeys()->Last()->GetName();
@@ -350,7 +314,6 @@ void ReconstructionMLEM::createP_dcbv(){
     // iterate through all voxels v
     this->nextVoxel->Reset();
     while ((this->keyVoxel = (TKey*)this->nextVoxel->Next())){
-        Double_t emissionsInVoxel = 0.0;
         TString nameOfVoxel = this->keyVoxel->GetName();
 
         TString internalName;
@@ -365,13 +328,12 @@ void ReconstructionMLEM::createP_dcbv(){
                                this->NbinsProjections, 0, this->NbinsProjections);
 
         TDirectory* dirOfVoxel = (TDirectory*)this->projectionsFile->Get(nameOfVoxel);
-
-        // iterate through all spectra in voxel v
         TIter nextS_dc(dirOfVoxel->GetListOfKeys());
         while ((this->keyS_dcVoxel = (TKey*)nextS_dc())){
+            // iterate through all spectra in voxel v
             TString nameOfS_dc = this->keyS_dcVoxel->GetName();
             TH1F* S_dc = (TH1F*)dirOfVoxel->Get(nameOfS_dc);
-            emissionsInVoxel += S_dc->Integral();
+            S_dc->Scale(1.0 / S_dc->Integral());  // faster convergence
 
             Int_t detectorD;
             Int_t detectorC;
@@ -384,8 +346,13 @@ void ReconstructionMLEM::createP_dcbv(){
             delete S_dc;
         }
 
-        p_dcb->Scale(1.0 / emissionsInVoxel);
         this->p_dcbv->AddLast(p_dcb);
+        this->p_dcbvSum.push_back(p_dcb->Integral());
+
+        TH3F* p_dcbPrime = (TH3F*)p_dcb->Clone("Prime");
+        p_dcbPrime->Multiply(this->N_dcb);
+        this->p_dcbvPrime->AddLast(p_dcbPrime);
+
         delete dirOfVoxel;
     }
 }
@@ -418,122 +385,132 @@ void ReconstructionMLEM::calculate(){
     // execute the maximum likelihood expectation maximization algorithm
     // to calculate the activity distribution A (=A_v)
 
-    TH3F* currentActivity = (TH3F*)this->A_v->Clone("Current Activity");
-
-    // get the measurements
-    TH3F* quotient = (TH3F*)this->N_dcb->Clone("Measurements");
-
-    // calculate the denominator = backprojection
-    TH3F* denominator = new TH3F("denom", "Denominator for correction factor",
+    // calculate the projection
+    TH3F* projections = new TH3F("projections", "Projections",
                                  this->numberOfDetectors, 0, this->numberOfDetectors,
                                  this->numberOfDetectors, 0, this->numberOfDetectors,
                                  this->NbinsProjections, 0, this->NbinsProjections);
+    this->projection(*projections);
 
-    this->nextVoxel->Reset();
-    while ((this->keyVoxel = (TKey*)this->nextVoxel->Next())){
-        Int_t indexX;
-        Int_t indexY;
-        Int_t indexZ;
+    // calculate the backprojection
+    TH3F* backprojections = new TH3F("backprojections", "Backprojections",
+                                     this->A_v->GetNbinsX(), 0, this->A_v->GetNbinsX(),
+                                     this->A_v->GetNbinsY(), 0, this->A_v->GetNbinsY(),
+                                     this->A_v->GetNbinsZ(), 0, this->A_v->GetNbinsZ());
+    this->backprojection(*projections, *backprojections);
 
-        // get activity A_v in voxel v
-        TString nameOfVoxel = this->keyVoxel->GetName();
-        TString titleOfVoxel = this->keyVoxel->GetTitle();
-        this->getImageSpaceIndices(titleOfVoxel, indexX, indexY, indexZ);
-        Double_t activityInVoxel = currentActivity->GetBinContent(indexX + 1, indexY + 1, indexZ + 1);
+    // calculate new activity
+    this->A_v->Multiply(backprojections);
 
-        // get p_dcb for voxel v
-        TH3F* p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi());
+//    // Chi²-Test
+//    TH3F* Chi2 = (TH3F*)this->N_dcb->Clone("Chi");
+//    Chi2->Add(projections, -1.0);
+//    Chi2->Multiply(Chi2);
+//    Chi2->Divide(projections);
+//    Double_t testVariable = Chi2->Integral();
+//    std::cout << testVariable << "\n";
 
-        // multiply them and add them to the denominator
-        denominator->Add(p_dcb, activityInVoxel);
-    }
+    delete backprojections;
+    delete projections;
+}
 
-    // calculate the ratio of backprojection and measurements
-    quotient->Divide(denominator);
-    delete denominator;
+void ReconstructionMLEM::projection(TH3F& p){
 
-//    Double_t minValue;
-//    Double_t maxValue;
-//    quotient->GetMinimumAndMaximum(minValue, maxValue);
-//    std::cout << minValue << " " << maxValue << " --- ";
+    Int_t voxel = 0;
+    for (Int_t z = 1; z <= this->A_v->GetNbinsZ(); ++z){
+        for (Int_t y = 1; y <= this->A_v->GetNbinsY(); ++y){
+            for (Int_t x = 1; x <= this->A_v->GetNbinsX(); ++x){
 
-//    Double_t stdDevXQuo = quotient->GetStdDev(1);
-//    Double_t stdDevYQuo = quotient->GetStdDev(2);
+                TH3F* p_dcb = (TH3F*)this->p_dcbv->At(voxel);
+                Double_t activityInVoxel = this->A_v->GetBinContent(x, y, z);
+                p.Add(p_dcb, activityInVoxel);
 
-//    std::cout << stdDevXQuo << " " << stdDevYQuo << " --- ";
-
-//    Double_t stdDevXA = this->A_v->GetStdDev(1);
-//    Double_t stdDevYA = this->A_v->GetStdDev(2);
-
-//    std::cout << stdDevXA << " " << stdDevYA << "\n";
-
-
-
-    // calculate new activity distribution
-    this->nextVoxel->Reset();
-    while ((this->keyVoxel = (TKey*)this->nextVoxel->Next())){
-        Int_t indexX;
-        Int_t indexY;
-        Int_t indexZ;
-
-        // get activity A_v in voxel v
-        TString nameOfVoxel = this->keyVoxel->GetName();
-        TString titleOfVoxel = this->keyVoxel->GetTitle();
-        this->getImageSpaceIndices(titleOfVoxel, indexX, indexY, indexZ);
-        Double_t activityInVoxel = currentActivity->GetBinContent(indexX + 1, indexY + 1, indexZ + 1);
-
-        // calculate correction factor
-        // costs memory + slow
-        // TH3F* p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi())->Clone("Current Probability");
-        // p_dcb->Multiply(quotient);
-        // Double_t correctionFactor = p_dcb->Integral();
-
-        // faster method
-        TH3F* p_dcb = (TH3F*)this->p_dcbv->At(nameOfVoxel.Atoi());
-        Double_t correctionFactor = 0.0;
-
-        for (Int_t d = 1; d <= this->numberOfDetectors; ++d){
-            for (Int_t c = 1; c <= this->numberOfDetectors; ++c){
-                for (Int_t bin = 1; bin <= this->NbinsProjections; ++bin){
-                    correctionFactor += p_dcb->GetBinContent(d, c, bin) * quotient->GetBinContent(d, c, bin);
-                }
+                ++voxel;
             }
         }
-
-        // calculate new activity A_v
-        this->A_v->SetBinContent(indexX + 1, indexY + 1, indexZ + 1,
-                                 activityInVoxel * correctionFactor);
     }
+}
 
-    delete quotient;
-    delete currentActivity;
+void ReconstructionMLEM::backprojection(TH3F& p, TH3F& bp){
+    // create TH3 for activity correction factors
+
+    Int_t voxel = 0;
+    Double_t lowerThreshold = 0.0001;  // heavily dependent of the real activity distribution
+                                       // needs adjustment
+
+    this->nextVoxel->Reset();
+    while ((this->keyVoxel = (TKey*)this->nextVoxel->Next())){
+
+        Int_t indexX;
+        Int_t indexY;
+        Int_t indexZ;
+        this->getImageSpaceIndices(this->keyVoxel->GetTitle(), indexX, indexY, indexZ);
+
+        Double_t correctionFactor = 0.0;
+        Double_t activityInVoxel = this->A_v->GetBinContent(indexX + 1, indexY + 1, indexZ + 1);
+
+        // only iterate over voxels with enough activity content --> save computing time
+        if (activityInVoxel >= lowerThreshold) {
+            TH3F* p_dcbPrime = (TH3F*)this->p_dcbvPrime->At(voxel);
+
+            for (Int_t d = 1; d <= this->numberOfDetectors; ++d){
+                for (Int_t c = 1; c <= this->numberOfDetectors; ++c){
+                    for (Int_t bin = 1; bin <= this->NbinsProjections; ++bin){
+
+                        Double_t N_dcbPrime = p.GetBinContent(d, c, bin);
+                        if (N_dcbPrime != 0) {
+                            correctionFactor += p_dcbPrime->GetBinContent(d, c, bin) / N_dcbPrime;
+                        }
+                    }
+                }
+            }
+
+            correctionFactor = correctionFactor / this->p_dcbvSum[voxel];
+            correctionFactor = std::pow(correctionFactor, 1.3);  // accelerate the convergence
+
+        } else{
+            correctionFactor = 1.0;
+        }
+
+        bp.SetBinContent(indexX + 1, indexY + 1, indexZ + 1,
+                        correctionFactor);
+
+        ++voxel;
+    }
 }
 
 // ##### ROOT #####
 void MLEM(){
-    // create an instance of the reconstruction class
+    TBenchmark bench;
+    bench.Start("total");
 
     // Specify the location of the measurement file
     TString pathToMeasurements = "../folder/subfolder/*.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0.root";
-//    pathToMeasurements = "../data/measurement_data/SPCIBase49/bins_50/SourcePos1.root";
-//    pathToMeasurements = "../data/measurement_data/SPCIBase49/bins_50/SourcePos24.root";
-//    pathToMeasurements = "../data/measurement_data/SPCIBase49/bins_50/SourcePos48.root";
-//    pathToMeasurements = "../data/measurement_data/SPCIBase49/bins_50/SourcePos6.root";
-//    pathToMeasurements = "../data/measurement_data/SPCIBase49/bins_50/SourcePos0+24+26+36.root";
+//    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos1.root";
+//    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos24.root";
+//    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos48.root";
+//    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos6.root";
+//    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourceCross.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourceDiagonal.root";
+
     pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins50/SourceSquare.root";
+//    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins50/Source0.root";
 
     // Specify the location of the projections file
     TString pathToProjection = "../folder/subfolder/*.root";
+//    pathToProjection = "../../data/SystemMatrix/Bins50/SPCIBase49.root";
     pathToProjection = "../../data/SystemMatrix/Bins50/SPCIBase441.root";
 
-    // Reconstruct the image
-    Int_t maximumNumberOfIterations = 20;
+    Int_t numberOfIterations = 100;
 
+    // create an instance of the reconstruction class
     ReconstructionMLEM* reco = new ReconstructionMLEM(pathToMeasurements, pathToProjection);
-    reco->start(maximumNumberOfIterations, kTRUE);
+    reco->start(numberOfIterations, kFALSE);
+
+    bench.Stop("total");
+    std::cout << "\nTotal Time: " << bench.GetRealTime("total") << " seconds\n";
 }
 
 // ##### COMPILE FILE #####
