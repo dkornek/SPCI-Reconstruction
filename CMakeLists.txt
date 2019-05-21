@@ -27,7 +27,7 @@ find_package(Boost 1.60.0)
 target_link_libraries(SPCI-Reconstruction PUBLIC ${Boost_LIBRARIES})
 
 # list(APPEND CMAKE_PREFIX_PATH $ENV{ROOTSYS})
-find_package(ROOT)
+find_package(ROOT 6.12.04 EXACT)
 target_link_libraries(SPCI-Reconstruction PUBLIC ${ROOT_LIBRARIES})
 
 ##### PACKAGING #####

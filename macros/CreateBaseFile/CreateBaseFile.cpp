@@ -120,7 +120,7 @@ void createVoxelList(TFile* fIn, TFile* fOut){
 void CreateBaseFile(){
 
     // open simulation file
-    TString pathToSimulation = "../../data/RawSimulation/G4SPCI_20181212_5x5mm2.root";
+    TString pathToSimulation = "../folder/subfolder/simulation.root";
     TFile* input = new TFile(pathToSimulation, "READ");
     if (!input->IsOpen()){
         std::cout << "Simulation file not found!\n";
@@ -128,7 +128,7 @@ void CreateBaseFile(){
     }
 
     // create new system matrix file
-    TString pathToProjection = "../../data/SystemMatrix/Original/SPCIBase441.root";
+    TString pathToProjection = "../folder/subfolder/basefile.root";
     TFile* output = new TFile(pathToProjection, "RECREATE");
     if (!output->IsOpen()){
         std::cout << "Output file could not be created!\n";

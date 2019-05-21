@@ -3,73 +3,122 @@
 #include "mlem.h"
 
 #include <iostream>
+#include <TH2.h>
 #include <TBenchmark.h>
 
-// ##### PUBLIC FUNCTIONS #####
-ReconstructionMLEM::ReconstructionMLEM(TString pathToMeasurements, TString pathToProjections){
+
+//// ##### PUBLIC FUNCTIONS #####
+ReconstructionMLEM::ReconstructionMLEM(TString pathToMeasurements, TString pathToProjections) :
+    accelerator(1), activityThreshold(0){
     // prepare all data to start the reconstruction
 
     // open files
-    this->openFile("MEASUREMENT", pathToMeasurements);
-    this->nextS_dcMeasurements = new TIter(this->measurementsFile->GetListOfKeys());
+    openFile("MEASUREMENT", pathToMeasurements);
+    nextS_dcMeasurements = new TIter(measurementsFile->GetListOfKeys());
 
-    this->openFile("PROJECTION", pathToProjections);
-    this->nextVoxel = new TIter(this->projectionsFile->GetListOfKeys());
+    openFile("PROJECTION", pathToProjections);
+    nextVoxel = new TIter(projectionsFile->GetListOfKeys());
+
+    TBenchmark b;
 
     // prepare the measurement data N_dcb
     // N_dcb = number of events in detector pair (d, c) separated by bins
-    this->createN_dcb();
+    b.Start("N_dcb");
+    createN_dcb();
+    b.Stop("N_dcb");
 
     // prepare the probabilities p_dcbv
     // p_dcbv = voxel v specific probabilitiy to contribute one count to N_dcb;
     // there are v 3d histograms p_dcb in the list p_dcbv
-    this->createP_dcbv();
+    b.Start("p_dcb");
+    createP_dcbv();
+    b.Stop("p_dcb");
 
-    // prepare the homogeneous activity distribution A_v
-    // A_v = activity in voxel v of the image space
-    this->createA_v();
+    std::cout << "\nN_dcb Creation Time:\t" << b.GetRealTime("N_dcb") << " s\n";
+    std::cout << "\np_dcb Creation Time:\t" << b.GetRealTime("p_dcb") << " s\n";
 }
 
 ReconstructionMLEM::~ReconstructionMLEM(){
-    delete this->A_v;
 
-    delete this->keyS_dcMeasurements;
-    delete this->nextS_dcMeasurements;
-    delete this->N_dcb;
-    delete this->measurementsFile;
+    delete A_v;
+    A_vProject3DSteps->Delete();
+    delete A_vProject3DSteps;
+    delete plotChi;
 
-    delete this->keyS_dcVoxel;
-    delete this->keyVoxel;
-    delete this->nextVoxel;
+    delete keyS_dcMeasurements;
+    delete nextS_dcMeasurements;
+    delete N_dcb;
+    delete measurementsFile;
+
+    delete keyS_dcVoxel;
+    delete keyVoxel;
+    delete nextVoxel;
+    delete projections;
     p_dcbv->Delete();
-    delete this->p_dcbv;
-    delete this->projectionsFile;
+    delete p_dcbv;
+    p_dcbvPrime->Delete();
+    delete p_dcbvPrime;
+    delete projectionsFile;
 }
 
-void ReconstructionMLEM::start(Int_t maxNumberOfIterations){
+void ReconstructionMLEM::start(Int_t maxNumberOfIterations, Double_t stoppingCriterion){
     // execute the calculation
 
-    this->checkValidity();
-    if (!this->isCalculationValid){
-        return;
-    }
-
     TBenchmark b;
-    Int_t numberOfIterations = 0;
+
+    // prepare the homogeneous activity distribution A_v
+    // A_v = activity in voxel v of the image space
+    b.Start("A_v");
+    createA_v();
+    b.Stop("A_v");
+    std::cout << "\nA_v Creation Time:\t" << b.GetRealTime("A_v") << " s\n";
+
+    Double_t chiSquare = 0;
+    std::vector<Double_t> chiSquareXaxis;
+    std::vector<Double_t> chiSquareYaxis;
+    A_vProject3DSteps = new TList();
 
     b.Start("stats");
-    for (;;++numberOfIterations){
+    Int_t numberOfIterations = 0;
+    for (;;){
+
         if (numberOfIterations == maxNumberOfIterations){
             break;
         }
 
-        this->calculate();
+        calculate();
+
+        if (numberOfIterations % 5 == 0){
+            chiSquare = calculateChiSquareStatistic();
+            chiSquareXaxis.push_back(numberOfIterations + 1);
+            chiSquareYaxis.push_back(chiSquare);
+        }
+
+        if (stoppingCriterion){
+            if (numberOfIterations % 5 == 1){
+                Double_t difference = chiSquare - calculateChiSquareStatistic();
+
+                if ((difference <= stoppingCriterion) && (difference >= 0)){
+                    std::cout << "Stopped at:\t" << difference << "\n";
+                    break;
+                }
+            }
+        }
+
+        if (numberOfIterations % 100 == 0){
+            plotActivity(numberOfIterations);
+        }
+
+        ++numberOfIterations;
     }
     b.Stop("stats");
 
     // Inform user
-    std::cout << "Image reconstruction done. Steps: " << numberOfIterations << "\n";
-    std::cout << "\nCalculation time: " << b.GetRealTime("stats") << " seconds\n";
+    std::cout << "\nImage reconstruction done. Steps: " << numberOfIterations << "\n";
+    std::cout << "\nCalculation Time:\t" << b.GetRealTime("stats") << " seconds\n";
+
+    // save Chi² statistics
+    plotChiStatistics(chiSquareXaxis, chiSquareYaxis);
 }
 
 // ##### PRIVATE FUNCTIONS #####
@@ -78,12 +127,12 @@ void ReconstructionMLEM::openFile(TString fileType, TString pathToFile){
     // open file of specified type
 
     if (fileType == "MEASUREMENT"){
-        this->measurementsFile = new TFile(pathToFile, "READ");
+        measurementsFile = new TFile(pathToFile, "READ");
         return;
     }
 
     if (fileType == "PROJECTION"){
-        this->projectionsFile = new TFile(pathToFile, "READ");
+        projectionsFile = new TFile(pathToFile, "READ");
         return;
     }
 }
@@ -104,12 +153,12 @@ void ReconstructionMLEM::getImageSpaceIndices(TString titleOfVoxel, Int_t &x, In
     title.Replace(title.Length() - 1, 1, ',');
 
     // actual coordinates
-    std::vector<Double_t> location = { 0, 0, 0 };
+    std::vector<Int_t> location = { 0, 0, 0 };
     for (Int_t i = 0; i < 3; ++i){
         Int_t positionOfSeparator = title.First(',');
         Int_t lengthOfString = title.Last(',');
 
-        location[i] =  ((TString)title(0, positionOfSeparator)).Atof();
+        location[i] =  ((TString)title(0, positionOfSeparator)).Atoi();
         title = title(positionOfSeparator + 1, lengthOfString - positionOfSeparator + 1);
     }
 
@@ -118,26 +167,42 @@ void ReconstructionMLEM::getImageSpaceIndices(TString titleOfVoxel, Int_t &x, In
     z = location[2];
 }
 
+void ReconstructionMLEM::fillImageSpaceIndices(Int_t x, Int_t y, Int_t z){
+    // get a vector of the image space indices
+
+    for (Int_t zIndex = 0; zIndex <= z; ++zIndex){
+        for (Int_t yIndex = 0; yIndex <= y; ++yIndex){
+            for (Int_t xIndex = 0; xIndex <= x; ++xIndex){
+
+                std::array<Int_t, 3> coordinate = { xIndex + 1,
+                                                    yIndex + 1,
+                                                    zIndex + 1};
+                imageIndices.push_back(coordinate);
+            }
+        }
+    }
+}
+
 void ReconstructionMLEM::fillN_dcb(){
     // fill N_dcb with number of events extracted from the spectra
 
-    this->nextS_dcMeasurements->Reset();
-    while ((this->keyS_dcMeasurements = (TKey*)this->nextS_dcMeasurements->Next())){
+    nextS_dcMeasurements->Reset();
+    while ((keyS_dcMeasurements = (TKey*)nextS_dcMeasurements->Next())){
+        // iterate through every measurement spectrum
 
         Int_t detectorD;
         Int_t detectorC;
-        TString nameOfS_dc = this->keyS_dcMeasurements->GetName();
-        this->getDetectorIndices(nameOfS_dc, detectorD, detectorC);
+        TString nameOfS_dc = keyS_dcMeasurements->GetName();
+        getDetectorIndices(nameOfS_dc, detectorD, detectorC);
 
         // get spectrum
-        TH1F* S_dc = (TH1F*)this->measurementsFile->Get(nameOfS_dc);
+        TH1F* S_dc = (TH1F*)measurementsFile->Get(nameOfS_dc);
         S_dc->Scale(1.0 / S_dc->Integral());  // faster convergence
 
         // fill N_dcb
-        #pragma omp parallel for
-        for (Int_t bin = 1; bin <= this->NbinsMeasurements; ++bin){
-            this->N_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
-                                       S_dc->GetBinContent(bin));
+        for (Int_t bin = 1; bin <= NbinsMeasurements; ++bin){
+            N_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                 S_dc->GetBinContent(bin));
         }
 
         delete S_dc;
@@ -147,17 +212,12 @@ void ReconstructionMLEM::fillN_dcb(){
 void ReconstructionMLEM::makeA_vHomogeneous(){
     // set all bin contents in A_v = 1
 
-    // iterate through all voxels
-    this->nextVoxel->Reset();
-    while ((this->keyVoxel = (TKey*)this->nextVoxel->Next())){
-        Int_t indexX;
-        Int_t indexY;
-        Int_t indexZ;
+    for (UInt_t v = 0; v < imageIndices.size(); ++v){
+        // iterate through all voxels
 
-        TString titleOfVoxel = this->keyVoxel->GetTitle();
-        this->getImageSpaceIndices(titleOfVoxel, indexX, indexY, indexZ);
-        this->A_v->SetBinContent(indexX + 1, indexY + 1, indexZ + 1,
-                                 1.0);
+        std::array<Int_t, 3> coordinate = imageIndices.at(v);
+        A_v->SetBinContent(coordinate[0], coordinate[1], coordinate[2],
+                           1.0);
     }
 }
 
@@ -165,12 +225,74 @@ void ReconstructionMLEM::checkValidity(){
     // calculation is only possible if binning pattern in the measurement and
     // projection spectra is identical
 
-    if (this->NbinsMeasurements == this->NbinsProjections){
-        this->isCalculationValid = kTRUE;
+    if (NbinsMeasurements == NbinsProjections){
+        isCalculationValid = kTRUE;
+
     } else{
         std::cout << "Calculation is not valid.\nBinning pattern is not consistent\n";
-        this->isCalculationValid = kFALSE;
+        isCalculationValid = kFALSE;
     }
+}
+
+Double_t ReconstructionMLEM::calculateChiSquareStatistic(){
+    // The Chi²-statistics is used to stop the MLEM algorithm before convergence
+    // The curve is monotonically decreasing -> Change of rate is proportional to convergence
+
+    Double_t ChiSquareTestVariable = 0.0;
+
+    for (Int_t d = 1; d <= numberOfDetectors; ++d){
+        for (Int_t c = 1; c <= numberOfDetectors; ++c){
+            for (Int_t bin = 1; bin <= NbinsProjections; ++bin){
+
+                Double_t projectionContent = projections->GetBinContent(d, c, bin);
+                if (projectionContent != 0){
+
+                    Double_t N_dcbContent = N_dcb->GetBinContent(d, c, bin);
+                    if (N_dcbContent != 0){
+
+                        ChiSquareTestVariable += std::pow(N_dcbContent - projectionContent, 2) / projectionContent;
+                    } else{
+
+                        ChiSquareTestVariable += projectionContent;
+                    }
+                }
+            }
+        }
+    }
+
+    return ChiSquareTestVariable;
+}
+
+void ReconstructionMLEM::plotActivity(Int_t step){
+    TH2F* A_v2DyxProjection = (TH2F*)A_v->Project3D("yx");
+    A_v2DyxProjection->SetStats(kFALSE);
+
+    TString name;
+    name.Form("Step_%i", step);
+    A_v2DyxProjection->SetName(name);
+    A_v2DyxProjection->SetTitle("2D Projection of 3D Activity Distribution");
+    A_v2DyxProjection->GetXaxis()->SetTitleOffset(1);
+    A_v2DyxProjection->GetYaxis()->SetTitleOffset(1);
+
+    A_v2DyxProjection->GetZaxis()->SetTitle("Relative Activity");
+    A_v2DyxProjection->GetZaxis()->SetTitleOffset(Float_t(1.4));
+
+    A_vProject3DSteps->AddLast(A_v2DyxProjection);
+}
+
+void ReconstructionMLEM::plotChiStatistics(std::vector<Double_t> xAxis, std::vector<Double_t> yAxis){
+    // show results of Chi test variable
+
+    Int_t n = xAxis.size();
+    if (n == 0){
+        return;
+    }
+
+    Double_t* x = &xAxis[0];
+    Double_t* y = &yAxis[0];
+
+    plotChi = new TGraph(n, x, y);
+    plotChi->SetTitle("#chi^{2}-Statistics;Number of iterations;#chi^{2}");
 }
 
 // ##### PREPARATION FUNCTIONS #####
@@ -184,82 +306,101 @@ void ReconstructionMLEM::createN_dcb(){
     Int_t detectorC;
     TString nameOfLastSpectrum;
 
-    nameOfLastSpectrum = this->measurementsFile->GetListOfKeys()->Last()->GetName();
-    this->getDetectorIndices(nameOfLastSpectrum, detectorD, detectorC);
+    nameOfLastSpectrum = measurementsFile->GetListOfKeys()->Last()->GetName();
+    getDetectorIndices(nameOfLastSpectrum, detectorD, detectorC);
 
     // get number of detectors
-    this->numberOfDetectors = std::max(detectorD, detectorC) + 1;
+    numberOfDetectors = std::max(detectorD, detectorC) + 1;
 
     // get number of bins
-    this->NbinsMeasurements = ((TH1F*)this->measurementsFile->Get(nameOfLastSpectrum))->GetNbinsX();
+    NbinsMeasurements = ((TH1F*)measurementsFile->Get(nameOfLastSpectrum))->GetNbinsX();
 
     // create the 3d histogram
-    this->N_dcb = new TH3F("N_dcb", "Number of events in bin b in S_dc",
-                           this->numberOfDetectors, 0, this->numberOfDetectors,
-                           this->numberOfDetectors, 0, this->numberOfDetectors,
-                           this->NbinsMeasurements, 0, this->NbinsMeasurements);
-    this->fillN_dcb();
+    N_dcb = new TH3F("N_dcb", "Number of events in bin b in S_dc",
+                     numberOfDetectors, 0, numberOfDetectors,
+                     numberOfDetectors, 0, numberOfDetectors,
+                     NbinsMeasurements, 0, NbinsMeasurements);
+    fillN_dcb();
 }
 
 void ReconstructionMLEM::createP_dcbv(){
     // create list of 3d histograms containing the probabilities for each voxel
 
-    this->p_dcbv = new TList();
-    this->p_dcbvPrime = new TList();
+    p_dcbv = new TList();
+    p_dcbvPrime = new TList();
 
     // get number of bins
-    TString nameOfLastVoxel = this->projectionsFile->GetListOfKeys()->Last()->GetName();
-    TDirectory* dirOfLastVoxel = (TDirectory*)this->projectionsFile->Get(nameOfLastVoxel);
+    TString nameOfLastVoxel = projectionsFile->GetListOfKeys()->Last()->GetName();
+    TDirectory* dirOfLastVoxel = (TDirectory*)projectionsFile->Get(nameOfLastVoxel);
     TString nameOfLastS_dc = dirOfLastVoxel->GetListOfKeys()->Last()->GetName();
-    this->NbinsProjections = ((TH1F*)dirOfLastVoxel->Get(nameOfLastS_dc))->GetNbinsX();
+    NbinsProjections = ((TH1F*)dirOfLastVoxel->Get(nameOfLastS_dc))->GetNbinsX();
     delete dirOfLastVoxel;
 
-    // iterate through all voxels v
-    this->nextVoxel->Reset();
-    while ((this->keyVoxel = (TKey*)this->nextVoxel->Next())){
-        TString nameOfVoxel = this->keyVoxel->GetName();
+    checkValidity();
+    if (!isCalculationValid){
+        return;
+    }
 
-        TString internalName;
-        internalName.Form("p_dcb_%s", nameOfVoxel.Data());
+    // iterate through all voxels v
+    nextVoxel->Reset();
+    while ((keyVoxel = (TKey*)nextVoxel->Next())){
+        TString nameOfVoxel = keyVoxel->GetName();
 
         TString description;
         description.Form("Probabilities to contribute one count to N_dcb from voxel %s", nameOfVoxel.Data());
 
+        TString internalName;
+        internalName.Form("p_dcb_%s", nameOfVoxel.Data());
         TH3F* p_dcb = new TH3F(internalName, description,
-                               this->numberOfDetectors, 0, this->numberOfDetectors,
-                               this->numberOfDetectors, 0, this->numberOfDetectors,
-                               this->NbinsProjections, 0, this->NbinsProjections);
+                               numberOfDetectors, 0, numberOfDetectors,
+                               numberOfDetectors, 0, numberOfDetectors,
+                               NbinsProjections, 0, NbinsProjections);
 
-        TDirectory* dirOfVoxel = (TDirectory*)this->projectionsFile->Get(nameOfVoxel);
+        internalName.Form("p_dcb_%s_prime", nameOfVoxel.Data());
+        TH3F* p_dcbPrime = new TH3F(internalName, description,
+                                    numberOfDetectors, 0, numberOfDetectors,
+                                    numberOfDetectors, 0, numberOfDetectors,
+                                    NbinsProjections, 0, NbinsProjections);
+
+        TDirectory* dirOfVoxel = (TDirectory*)projectionsFile->Get(nameOfVoxel);
         TIter nextS_dc(dirOfVoxel->GetListOfKeys());
-        while ((this->keyS_dcVoxel = (TKey*)nextS_dc())){
+        while ((keyS_dcVoxel = (TKey*)nextS_dc())){
             // iterate through all spectra in voxel v
-            TString nameOfS_dc = this->keyS_dcVoxel->GetName();
+
+            TString nameOfS_dc = keyS_dcVoxel->GetName();
             TH1F* S_dc = (TH1F*)dirOfVoxel->Get(nameOfS_dc);
             S_dc->Scale(1.0 / S_dc->Integral());  // faster convergence
 
             Int_t detectorD;
             Int_t detectorC;
-            this->getDetectorIndices(nameOfS_dc(3, 4), detectorD, detectorC);
+            getDetectorIndices(nameOfS_dc(3, 4), detectorD, detectorC);
 
-            #pragma omp parallel for
-            for (Int_t bin = 1; bin <= this->NbinsProjections; ++bin){
+            for (Int_t bin = 1; bin <= NbinsProjections; ++bin){
+                Double_t p_dcbBinContent = S_dc->GetBinContent(bin);
                 p_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
-                                     S_dc->GetBinContent(bin));
+                                     p_dcbBinContent);
+
+                Double_t N_dcbBinContent = N_dcb->GetBinContent(detectorD + 1, detectorC + 1, bin);
+                Double_t p_dcbPrimeBinContent = p_dcbBinContent * N_dcbBinContent;
+                p_dcbPrime->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                          p_dcbPrimeBinContent);
             }
 
             delete S_dc;
         }
 
-        this->p_dcbv->AddLast(p_dcb);
-        this->p_dcbvSum.push_back(p_dcb->Integral());
-
-        TH3F* p_dcbPrime = (TH3F*)p_dcb->Clone("Prime");
-        p_dcbPrime->Multiply(this->N_dcb);
-        this->p_dcbvPrime->AddLast(p_dcbPrime);
+        p_dcbv->AddLast(p_dcb);
+        p_dcbvPrime->AddLast(p_dcbPrime);
+        p_dcbvSum.push_back(p_dcb->Integral());
 
         delete dirOfVoxel;
     }
+
+    // projections histogram used for the calculation
+    projections = new TH3F("projections", "Projections",
+                           numberOfDetectors, 0, numberOfDetectors,
+                           numberOfDetectors, 0, numberOfDetectors,
+                           NbinsProjections, 0, NbinsProjections);
 }
 
 void ReconstructionMLEM::createA_v(){
@@ -274,15 +415,36 @@ void ReconstructionMLEM::createA_v(){
 
     // get volume
     TString titleOfLastVoxel;
-    titleOfLastVoxel = this->projectionsFile->GetListOfKeys()->Last()->GetTitle();
-    this->getImageSpaceIndices(titleOfLastVoxel, indexX, indexY, indexZ);
+    titleOfLastVoxel = projectionsFile->GetListOfKeys()->Last()->GetTitle();
+    getImageSpaceIndices(titleOfLastVoxel, indexX, indexY, indexZ);
+    fillImageSpaceIndices(indexX, indexY, indexZ);
+
+    if (imageVolume.size() != 6){
+        imageVolume = {0, static_cast<Double_t>(indexX + 1),
+                       0, static_cast<Double_t>(indexY + 1),
+                       0, static_cast<Double_t>(indexZ + 1)};
+    }
 
     // create the 3d histogram
-    this->A_v = new TH3F("A_v", "Activity distribution",
-                         indexX + 1, 0, indexX + 1,
-                         indexY + 1, 0, indexY + 1,
-                         indexZ + 1, 0, indexZ + 1);
-    this->makeA_vHomogeneous();
+    A_v = new TH3F("A_v", "3D Activity Distribution",
+                   indexX + 1, imageVolume[0], imageVolume[1],
+                   indexY + 1, imageVolume[2], imageVolume[3],
+                   indexZ + 1, imageVolume[4], imageVolume[5]);
+
+    makeA_vHomogeneous();
+
+    // Plotting options
+    A_v->GetXaxis()->SetTitle("#it{x} / mm");
+    A_v->GetXaxis()->SetTitleOffset(1.5);
+    A_v->SetNdivisions(Int_t(std::max(5.0, 0.5 * indexX)), "X");
+
+    A_v->GetYaxis()->SetTitle("#it{y} / mm");
+    A_v->GetXaxis()->SetTitleOffset(1.5);
+    A_v->SetNdivisions(Int_t(std::max(5.0, 0.5 * indexY)), "Y");
+
+    A_v->GetZaxis()->SetTitle("#it{z} / mm");
+    A_v->GetZaxis()->SetTitleOffset(1.5);
+    A_v->SetNdivisions(Int_t(std::max(5.0, 0.5 * indexZ)), "Z");
 }
 
 // ##### CALCULATION FUNCTIONS #####
@@ -290,89 +452,65 @@ void ReconstructionMLEM::calculate(){
     // execute the maximum likelihood expectation maximization algorithm
     // to calculate the activity distribution A (=A_v)
 
-    // calculate the backprojection
-    TH3F* projections = new TH3F("projections", "Projections",
-                                 this->numberOfDetectors, 0, this->numberOfDetectors,
-                                 this->numberOfDetectors, 0, this->numberOfDetectors,
-                                 this->NbinsProjections, 0, this->NbinsProjections);
-    this->projection(*projections);
+    // calculate the projection
+    projection();
 
     // calculate the backprojection
-    TH3F* backprojections = new TH3F("backprojections", "Backprojections",
-                                     this->A_v->GetNbinsX(), 0, this->A_v->GetNbinsX(),
-                                     this->A_v->GetNbinsY(), 0, this->A_v->GetNbinsY(),
-                                     this->A_v->GetNbinsZ(), 0, this->A_v->GetNbinsZ());
-    this->backprojection(*projections, *backprojections);
-
-    // calculate new activity
-    this->A_v->Multiply(backprojections);
-
-    delete backprojections;
-    delete projections;
+    backprojection();
 }
 
-void ReconstructionMLEM::projection(TH3F& p){
+void ReconstructionMLEM::projection(){
+    // calculates the projection
 
-    Int_t voxel = 0;
-    for (Int_t z = 1; z <= this->A_v->GetNbinsZ(); ++z){
-        for (Int_t y = 1; y <= this->A_v->GetNbinsY(); ++y){
-            for (Int_t x = 1; x <= this->A_v->GetNbinsX(); ++x){
+    projections->Reset();
+    #pragma omp parallel for
+    for (UInt_t v = 0; v < imageIndices.size(); ++v){
+        std::array<Int_t, 3> coordinate = imageIndices.at(v);
 
-                TH3F* p_dcb = (TH3F*)this->p_dcbv->At(voxel);
-                Double_t activityInVoxel = this->A_v->GetBinContent(x, y, z);
-                p.Add(p_dcb, activityInVoxel);
+        TH3F* p_dcb = (TH3F*)p_dcbv->At(v);
+        Double_t activityInVoxel = A_v->GetBinContent(coordinate[0], coordinate[1], coordinate[2]);
 
-                ++voxel;
-            }
-        }
+        projections->Add(p_dcb, activityInVoxel);
     }
 }
 
-void ReconstructionMLEM::backprojection(TH3F& p, TH3F& bp){
+void ReconstructionMLEM::backprojection(){
     // create TH3 for activity correction factors
 
-    Int_t voxel = 0;
-    Double_t lowerThreshold = 0.0001;  // heavily dependent of the real activity distribution
-                                       // needs adjustment
-
-    this->nextVoxel->Reset();
-    while ((this->keyVoxel = (TKey*)this->nextVoxel->Next())){
-
-        Int_t indexX;
-        Int_t indexY;
-        Int_t indexZ;
-        this->getImageSpaceIndices(this->keyVoxel->GetTitle(), indexX, indexY, indexZ);
-
+    for (UInt_t v = 0; v < imageIndices.size(); ++v){
+        std::array<Int_t, 3> coordinate = imageIndices.at(v);
         Double_t correctionFactor = 0.0;
-        Double_t activityInVoxel = this->A_v->GetBinContent(indexX + 1, indexY + 1, indexZ + 1);
 
-        // only iterate over voxels with enough activity content --> save computing time
-        if (activityInVoxel >= lowerThreshold) {
-            TH3F* p_dcbPrime = (TH3F*)this->p_dcbvPrime->At(voxel);
+        Double_t activityInVoxel = A_v->GetBinContent(coordinate[0], coordinate[1], coordinate[2]);
+        if (activityInVoxel >= activityThreshold){
+            TH3F* p_dcbPrime = (TH3F*)p_dcbvPrime->At(v);
 
             #pragma omp parallel for reduction(+: correctionFactor)
-            for (Int_t d = 1; d <= this->numberOfDetectors; ++d){
-                for (Int_t c = 1; c <= this->numberOfDetectors; ++c){
-                    for (Int_t bin = 1; bin <= this->NbinsProjections; ++bin){
+            for (Int_t d = 1; d <= numberOfDetectors; ++d){
+                for (Int_t c = 1; c <= numberOfDetectors; ++c){
+                    for (Int_t bin = 1; bin <= NbinsProjections; ++bin){
 
-                        Double_t N_dcbPrime = p.GetBinContent(d, c, bin);
-                        if (N_dcbPrime != 0) {
-                            correctionFactor += p_dcbPrime->GetBinContent(d, c, bin) / N_dcbPrime;
+                        Double_t N_dcbPrimeContent = projections->GetBinContent(d, c, bin);
+                        if (N_dcbPrimeContent != 0){
+
+                            Double_t p_dcbPrimeContent = p_dcbPrime->GetBinContent(d, c, bin);
+                            if (p_dcbPrimeContent != 0){
+
+                                correctionFactor += p_dcbPrimeContent / N_dcbPrimeContent;
+                            }
                         }
                     }
                 }
             }
 
-            correctionFactor = correctionFactor / this->p_dcbvSum[voxel];
-            correctionFactor = std::pow(correctionFactor, 1.3);  // accelerate the convergence
+            correctionFactor = correctionFactor / p_dcbvSum[v];
+            correctionFactor = std::pow(correctionFactor, accelerator);  // accelerate the convergence
 
         } else{
             correctionFactor = 1.0;
         }
 
-        bp.SetBinContent(indexX + 1, indexY + 1, indexZ + 1,
-                        correctionFactor);
-
-        ++voxel;
+        A_v->SetBinContent(coordinate[0], coordinate[1], coordinate[2],
+                           correctionFactor * activityInVoxel);
     }
 }
