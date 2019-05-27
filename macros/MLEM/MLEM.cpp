@@ -300,7 +300,25 @@ void ReconstructionMLEM::fillN_dcb(){
 
         // get spectrum
         TH1F* S_dc = (TH1F*)measurementsFile->Get(nameOfS_dc);
-        S_dc->Scale(1.0 / S_dc->Integral());  // faster convergence
+
+        Double_t integral = S_dc->Integral();
+        if (integral != 0){
+            S_dc->Scale(1.0 / integral);  // faster convergence
+
+            // fill N_dcb
+            for (Int_t bin = 1; bin <= NbinsMeasurements; ++bin){
+                N_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                     S_dc->GetBinContent(bin));
+            }
+
+        } else{
+
+            // fill N_dcb
+            for (Int_t bin = 1; bin <= NbinsMeasurements; ++bin){
+                N_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                     0);
+            }
+        }
 
         // fill N_dcb
         for (Int_t bin = 1; bin <= NbinsMeasurements; ++bin){
@@ -512,14 +530,27 @@ void ReconstructionMLEM::createP_dcbv(){
             Int_t detectorC;
             getDetectorIndices(nameOfS_dc(3, 4), detectorD, detectorC);
             for (Int_t bin = 1; bin <= NbinsProjections; ++bin){
-                Double_t p_dcbBinContent = S_dc->GetBinContent(bin);
-                Double_t p_dcbPrimeBinContent = p_dcbBinContent * N_dcb->GetBinContent(detectorD + 1, detectorC + 1, bin);
 
-                p_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
-                                     p_dcbBinContent);
+                Double_t N_dcbBinContent = N_dcb->GetBinContent(detectorD + 1, detectorC + 1, bin);
+                if (N_dcbBinContent == 0){
 
-                p_dcbPrime->SetBinContent(detectorD + 1, detectorC + 1, bin,
-                                          p_dcbPrimeBinContent);
+                    p_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                         0);
+
+                    p_dcbPrime->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                              0);
+                } else{
+
+                    Double_t p_dcbBinContent = S_dc->GetBinContent(bin);
+                    Double_t p_dcbPrimeBinContent = p_dcbBinContent * N_dcbBinContent;
+
+                    p_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                         p_dcbBinContent);
+
+                    p_dcbPrime->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                              p_dcbPrimeBinContent);
+
+                }
             }
 
             delete S_dc;
@@ -660,20 +691,21 @@ void MLEM(){
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos24.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos48.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos6.root";
-    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36.root";
+//    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourceCross.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourceDiagonal.root";
 
 //    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins50/SourceSquare.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins50/Source0.root";
+    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins50/Source20.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins50/SourceH.root";
-//      pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins700/SourceHZDR.root";
+//    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins700/SourceHZDR.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins700/SourceH.root";
 
     // Specify the location of the projections file
     TString pathToProjection = "../folder/subfolder/*.root";
-    pathToProjection = "../../data/SystemMatrix/Bins50/SPCIBase49.root";
-//    pathToProjection = "../../data/SystemMatrix/Bins50/SPCIBase441.root";
+//    pathToProjection = "../../data/SystemMatrix/Bins50/SPCIBase49.root";
+    pathToProjection = "../../data/SystemMatrix/Bins50/SPCIBase441.root";
 //    pathToProjection = "../../data/SystemMatrix/Original/SPCIBase441.root";
 
 
@@ -683,8 +715,8 @@ void MLEM(){
     reco->setActivityThreshold(0.001);
     reco->setImageVolume({-50, 50, -50, 50, 5, 10});
 
-    Int_t numberOfIterations = 1000;
-    Double_t stoppingCriterion = 0.00000001;
+    Int_t numberOfIterations = 50;
+    Double_t stoppingCriterion = 0.001;
     reco->start(numberOfIterations, stoppingCriterion, kTRUE);
 
     b.Stop("total");

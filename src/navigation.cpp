@@ -31,20 +31,20 @@ int promptChoice(std::string promptString = "SELECT: "){
     return choice;
 }
 
-double promptStopCriterion(){
-    // prompt user for choosing an abort criterion for the iterative formula
+double promptParameter(std::string promptString, double lowerLimit, double upperLimit){
+    // prompt user for choosing any needed parameter
 
     std::string input;
     double choice;
 
     for (;;){
-        std::cout << "CHOOSE AN ABORT CRITERIUM (0 .. <= 1): ";
+        std::cout << promptString;
         std::cin >> input;  // get user input
 
         try{
             choice = boost::lexical_cast<double>(input);
 
-            if ((choice <= 0) || (choice > 1)){
+            if ((choice < lowerLimit) || (choice >= upperLimit)){
                 continue;
 
             } else{
@@ -161,11 +161,11 @@ TemplateMenu* ReconstructionMenu::getNextMenu(bool& isQuitOptionSelected){
         break;
 
     case 2:
-        // pathToMeasurements = promptPath("TYPE PATH TO MEASUREMENTS FILE: ");
-        pathToMeasurements = "../data/Measurements/SPCIBase441/Bins50/SourceSquare.root";
+//        pathToMeasurements = promptPath("TYPE PATH TO MEASUREMENTS FILE: ");
+        pathToMeasurements = "../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36.root";
 
-        // pathToProjections = promptPath("TYPE PATH TO PROJECTIONS FILE: ");
-        pathToProjections = "../data/SystemMatrix/Bins50/SPCIBase441.root";
+//        pathToProjections = promptPath("TYPE PATH TO PROJECTIONS FILE: ");
+        pathToProjections = "../data/SystemMatrix/Bins50/SPCIBase49.root";
 
         nextMenu = new AlgorithmMenu(pathToMeasurements, pathToProjections);
         break;
@@ -203,7 +203,7 @@ TemplateMenu* AlgorithmMenu::getNextMenu(bool& isQuitOptionSelected){
         break;
 
     case 2:
-        nextMenu = new MLEMMenu(this->pathToMeasurements, this->pathToProjections);
+        nextMenu = new MLEMMenu(pathToMeasurements, pathToProjections);
         break;
 
     case 3:
@@ -239,30 +239,34 @@ TemplateMenu* MLEMMenu::getNextMenu(bool& isQuitOptionSelected){
 
     TString saveDataName;
     int maxNumberOfIterations;
-//    double stopCriterion;
+    double stopCriterion;
+    double accelerator;
     ReconstructionMLEM* reco;
     ActivityDistribution* activity;
 
     switch (promptChoice()) {
     case 1:
-        nextMenu = new AlgorithmMenu(this->pathToMeasurements, this->pathToProjections);
+        nextMenu = new AlgorithmMenu(pathToMeasurements, pathToProjections);
         break;
 
     case 2:
-        // saveDataName = promptFileName();
-        saveDataName = "../test/Activity.root";
-//        maxNumberOfIterations = promptChoice("CHOOSE MAXIMUM NUMBER OF ITERATIONS: ");
-        maxNumberOfIterations = 100;
-//        stopCriterion = promptStopCriterion();
-//        stopCriterion = 0.999999999;
+        saveDataName = promptFileName();
+//        saveDataName = "../test/Activity.root";
+        maxNumberOfIterations = promptChoice("CHOOSE MAXIMUM NUMBER OF ITERATIONS: ");
+//        maxNumberOfIterations = 300;
+        stopCriterion = promptParameter("CHOOSE A STOPPING CRITERION ( 0 < ... < 1, 0 = NO ABORTION): ", 0.0, 1.0);
+//        stopCriterion = 0;
+        accelerator = promptParameter("CHOOSE AN OVER-RELAXATION PARAMETER ( 1 < ... < 2, 1 = NO OVER-RELAXATION: ", 1.0, 2.0);
+//        accelerator = 1.5;
 
-        reco = new ReconstructionMLEM(this->pathToMeasurements, this->pathToProjections);
-        reco->start(maxNumberOfIterations);
+        reco = new ReconstructionMLEM(pathToMeasurements, pathToProjections);
+        reco->setAccelerator(accelerator);
+        reco->setActivityThreshold(0);                      // make function
+        reco->setImageVolume({-50, 50, -50, 50, 5, 10});    // make function
+        reco->start(maxNumberOfIterations, stopCriterion);
 
-        activity = new ActivityDistribution(reco->A_v, saveDataName);
-        activity->save3DHistogram();
-        activity->save2DProjection();
-        activity->save2DSlices();
+        activity = new ActivityDistribution(saveDataName);
+        activity->saveAll(reco->A_v, reco->A_vProject3DSteps, reco->plotChi);
 
         nextMenu = new MainMenu();
         break;

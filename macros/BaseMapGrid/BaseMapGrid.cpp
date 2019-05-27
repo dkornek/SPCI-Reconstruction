@@ -5,19 +5,18 @@
 
 #include "/home/MED/koeglerto/Programs/Root-Work/StyleSheets/StyleSheet.C"
 
-void BaseMapGrid()
-{
+void BaseMapGrid(){
     LoadStyles();
     gROOT->SetStyle("SinglePadStyle");
     gROOT->ForceStyle();
 
-    Int_t numberOfVoxelsX = 20;
-    Int_t numberOfVoxelsY = 20;
+    Int_t numberOfVoxelsX = 6;
+    Int_t numberOfVoxelsY = 6;
 
-    Double_t rangeXmin = -60.0;
-    Double_t rangeXmax = 60.0;
-    Double_t rangeYmin = -60.0;
-    Double_t rangeYmax= 60.0;
+    Double_t rangeXmin = -40.0;
+    Double_t rangeXmax = 40.0;
+    Double_t rangeYmin = -40.0;
+    Double_t rangeYmax = 40.0;
 
     // prepare the layout
     TLatex text;
@@ -33,8 +32,8 @@ void BaseMapGrid()
     Int_t numberOfMarker = 0;
     Double_t markerX;  // position of marker in x axis
     Double_t markerY;  // position of marker in y axis
-    Double_t sizeX = 5.0;  // size (mm) of marker in x axis
-    Double_t sizeY = 5.0;  // size (mm) of marker in y axis
+    Double_t sizeX = 10.0;  // size (mm) of marker in x axis
+    Double_t sizeY = 10.0;  // size (mm) of marker in y axis
 
     TCanvas *canvas = new TCanvas("base", "BaseGrid", 800, 600);
     TH2F *histogram = new TH2F("BaseGridMap", "SCI Base Grid",
@@ -45,7 +44,7 @@ void BaseMapGrid()
     histogram->Draw();
 
     // draw the markers
-    for (Int_t j = numberOfVoxelsY; j >= 0; --j){
+    for (Int_t j = 0; j <= numberOfVoxelsY; ++j){
         for (Int_t i = 0; i <= numberOfVoxelsX; ++i){
 
             // draw the marker
@@ -53,7 +52,7 @@ void BaseMapGrid()
             markerY = j * sizeY - rangeYmax + 10;
             marker.DrawMarker(markerX, markerY);
 
-            if (i % 2 == 0){
+            if (i % 1 == 0){
                 nameOfMarker.Form("%i", numberOfMarker);
                 text.DrawLatex(markerX - 0.5, markerY - 0.5, nameOfMarker);
             }
@@ -63,3 +62,4 @@ void BaseMapGrid()
     }
 
     canvas->Update();
+}

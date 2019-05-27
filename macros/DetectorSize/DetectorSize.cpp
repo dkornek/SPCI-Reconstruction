@@ -90,7 +90,6 @@ void DetectorSize(){
 
     // open measurements file
     TString pathToMeasurement = "../folder/subfolder/measurement.root";
-    pathToMeasurement = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0.root";
     TFile* input = new TFile(pathToMeasurement, "READ");
     if (!input->IsOpen()){
         std::cout << "Measurement file not found!\n";
@@ -98,7 +97,7 @@ void DetectorSize(){
     }
 
     // open file for saving new detector arrangement
-    TFile* output = new TFile("2x2.root", "RECREATE");
+    TFile* output = new TFile("*.root", "RECREATE");
     if (!output->IsOpen()){
         std::cout << "Output file could not be created!\n";
         return;
@@ -106,7 +105,7 @@ void DetectorSize(){
 
     // choose detectors to be considered
     TList* spectraList = createEmptySpectraList(input);
-    std::vector<Int_t> detectorID = {5, 6, 9, 10};
+    std::vector<Int_t> detectorID = { };  // change here!
 
     // add spectra to list
     addSpectraToList(input, spectraList, detectorID);
@@ -132,4 +131,4 @@ void DetectorSize(){
 // 5, 6, 9, 10
 
 // ##### 3 x 3 DETECTOR #####
-// 0, 1, 2, 4, 5, 6, 10, 9, 8
+// 0, 1, 2, 4, 5, 6, 8, 9, 10

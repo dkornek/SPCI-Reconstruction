@@ -197,7 +197,24 @@ void ReconstructionMLEM::fillN_dcb(){
 
         // get spectrum
         TH1F* S_dc = (TH1F*)measurementsFile->Get(nameOfS_dc);
-        S_dc->Scale(1.0 / S_dc->Integral());  // faster convergence
+        Double_t integral = S_dc->Integral();
+        if (integral != 0){
+            S_dc->Scale(1.0 / integral);  // faster convergence
+
+            // fill N_dcb
+            for (Int_t bin = 1; bin <= NbinsMeasurements; ++bin){
+                N_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                     S_dc->GetBinContent(bin));
+            }
+
+        } else{
+
+            // fill N_dcb
+            for (Int_t bin = 1; bin <= NbinsMeasurements; ++bin){
+                N_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                     0);
+            }
+        }
 
         // fill N_dcb
         for (Int_t bin = 1; bin <= NbinsMeasurements; ++bin){
@@ -374,16 +391,28 @@ void ReconstructionMLEM::createP_dcbv(){
             Int_t detectorD;
             Int_t detectorC;
             getDetectorIndices(nameOfS_dc(3, 4), detectorD, detectorC);
-
             for (Int_t bin = 1; bin <= NbinsProjections; ++bin){
-                Double_t p_dcbBinContent = S_dc->GetBinContent(bin);
-                p_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
-                                     p_dcbBinContent);
 
                 Double_t N_dcbBinContent = N_dcb->GetBinContent(detectorD + 1, detectorC + 1, bin);
-                Double_t p_dcbPrimeBinContent = p_dcbBinContent * N_dcbBinContent;
-                p_dcbPrime->SetBinContent(detectorD + 1, detectorC + 1, bin,
-                                          p_dcbPrimeBinContent);
+                if (N_dcbBinContent == 0){
+
+                    p_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                         0);
+
+                    p_dcbPrime->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                              0);
+                } else{
+
+                    Double_t p_dcbBinContent = S_dc->GetBinContent(bin);
+                    Double_t p_dcbPrimeBinContent = p_dcbBinContent * N_dcbBinContent;
+
+                    p_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                         p_dcbBinContent);
+
+                    p_dcbPrime->SetBinContent(detectorD + 1, detectorC + 1, bin,
+                                              p_dcbPrimeBinContent);
+
+                }
             }
 
             delete S_dc;
