@@ -1,6 +1,7 @@
 // measurements.h
 
 #pragma once
+#include <algorithm>
 #include <TH3.h>
 #include <TKey.h>
 #include <TFile.h>

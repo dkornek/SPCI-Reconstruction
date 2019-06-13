@@ -3,6 +3,7 @@
 #pragma once
 #include <vector>
 #include <array>
+#include <algorithm>
 
 #include <TH3.h>
 

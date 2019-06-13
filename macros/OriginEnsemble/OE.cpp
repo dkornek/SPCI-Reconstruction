@@ -31,6 +31,7 @@
 #include <TCanvas.h>
 
 
+/*
 // ##### STATE CHARACTERIZATION #####
 class State{
 public:
@@ -40,80 +41,82 @@ public:
 
     std::vector<Int_t> countsInVoxel;           // counts C_sv in voxel v for all events
 };
+*/
 
 // ##### RECONSTRUCTION #####
 class ReconstructionOE{
 public:
-    ReconstructionOE(TString pathToMeasurements, TString pathToProjections);
-    ~ReconstructionOE();
+//    ReconstructionOE(TString pathToMeasurements, TString pathToProjections);
+//    ~ReconstructionOE();
     void start();
 
     // Activity distribution
-    TH3F* A_v;
-    TH2F* A_vProject3D;
+//    TH3F* A_v;
+//    TH2F* A_vProject3D;
 
 private:
     // ##### UTILITIES #####
-    void openFile(TString fileType, TString pathToFile);
-    void getDetectorIndices(TString nameOfSpectrum, Int_t& d, Int_t& c);
-    void getImageSpaceIndices(TString titleOfVoxel, Int_t& x, Int_t& y, Int_t& z);
-    void fillImageSpaceIndices(Int_t x, Int_t y, Int_t z);
+//    void openFile(TString fileType, TString pathToFile);
+//    void getDetectorIndices(TString nameOfSpectrum, Int_t& d, Int_t& c);
+//    void getImageSpaceIndices(TString titleOfVoxel, Int_t& x, Int_t& y, Int_t& z);
+//    void fillImageSpaceIndices(Int_t x, Int_t y, Int_t z);
     void generateInitialState();
     void generateNextState();
     void checkValidity();
     void plotActivity();
 
-    // ##### PREPARATION FUNCTIONS #####
-    void extractInfoFromMeasurements();
-    void createP_dcbv();
-    void createA_v();
+//    // ##### PREPARATION FUNCTIONS #####
+//    void extractInfoFromMeasurements();
+//    void createP_dcbv();
+//    void createA_v();
 
     // ##### CALCULATION FUNCTIONS #####
     void calculateActivity();
     Double_t calculateTransitionProbability();
 
     // ##### MEMBERS #####
-    Bool_t isCalculationValid;
+//    Bool_t isCalculationValid;
 
     TCanvas* canvasResults;
     TPad* plot3D;
     TPad* plot2D;
 
-    // Activity Data
-    Int_t A_vBinsX;
-    Int_t A_vBinsY;
-    Int_t A_vBinsZ;
+//    // Activity Data
+//    Int_t A_vBinsX;
+//    Int_t A_vBinsY;
+//    Int_t A_vBinsZ;
 
-    std::vector<Double_t> imageVolume;  // in mm, xMin, xMax, yMin, yMax, zMin, zMax
-    std::vector<std::array<Int_t, 3> > imageIndices;
-    Int_t numberOfVoxels;
+//    std::vector<Double_t> imageVolume;  // in mm, xMin, xMax, yMin, yMax, zMin, zMax
+//    std::vector<std::array<Int_t, 3> > imageIndices;
+//    Int_t numberOfVoxels;
 
     std::vector<State> beforeEquilibrium;  // states before in equilibrium
     std::vector<State> originEnsembles;  // states in equilibrium
 
-    // Measurement Data
-    TFile* measurementsFile;
+//    // Measurement Data
+//    TFile* measurementsFile;
 
-    Int_t numberOfDetectors;
-    Int_t NbinsMeasurements;
-    Int_t numberOfEvents;
+//    Int_t numberOfDetectors;
+//    Int_t NbinsMeasurements;
+//    Int_t numberOfEvents;
 
-    TIter* nextS_dcMeasurements;
-    TKey* keyS_dcMeasurements;
+//    TIter* nextS_dcMeasurements;
+//    TKey* keyS_dcMeasurements;
 
-    // Projection Data / System Matrix
-    TFile* projectionsFile;
+//    // Projection Data / System Matrix
+//    TFile* projectionsFile;
 
-    TList* p_dcbv;
-    std::vector<Double_t> p_v;  // p_v = SUM_{dcb} (p_dcbv)
+//    TList* p_dcbv;
+//    std::vector<Double_t> p_v;  // p_v = SUM_{dcb} (p_dcbv)
 
-    Int_t NbinsProjections;
+//    Int_t NbinsProjections;
 
-    TIter* nextVoxel;
-    TKey* keyVoxel;
-    TKey* keyS_dcVoxel;
+//    TIter* nextVoxel;
+//    TKey* keyVoxel;
+//    TKey* keyS_dcVoxel;
 };
 
+/*
 // ##### PUBLIC FUNCTIONS #####
 ReconstructionOE::ReconstructionOE(TString pathToMeasurements, TString pathToProjections) :
     canvasResults(nullptr), plot3D(nullptr), plot2D(nullptr){
@@ -139,6 +142,7 @@ ReconstructionOE::ReconstructionOE(TString pathToMeasurements, TString pathToPro
     std::cout << "\np_dcb Creation Time:\t" << b.GetRealTime("p_dcb") << " s\n";
 }
 
+
 ReconstructionOE::~ReconstructionOE(){
 
     delete plot2D;
@@ -159,6 +163,7 @@ ReconstructionOE::~ReconstructionOE(){
     delete p_dcbv;
     delete projectionsFile;
 }
+
 
 void ReconstructionOE::start(){
     // Reconstruct the image using the Origin Ensemble algorithm
@@ -190,6 +195,7 @@ void ReconstructionOE::start(){
 //    plotActivity();
 }
 
+
 // ##### PRIVATE FUNCTIONS #####
 // ##### UTILITIES #####
 void ReconstructionOE::openFile(TString fileType, TString pathToFile){
@@ -205,6 +211,7 @@ void ReconstructionOE::openFile(TString fileType, TString pathToFile){
         return;
     }
 }
+*/
 
 void ReconstructionOE::getDetectorIndices(TString nameOfSpectrum, Int_t &d, Int_t &c){
     // extract index of both the detectors from the name of the spectrum
@@ -252,6 +259,7 @@ void ReconstructionOE::fillImageSpaceIndices(Int_t x, Int_t y, Int_t z){
     }
 }
 
+/*
 void ReconstructionOE::generateInitialState(){
     // generate random inital state for the origin locations in the image space
 
@@ -313,6 +321,7 @@ void ReconstructionOE::generateInitialState(){
     // save number of total events
     numberOfEvents = initialState.event.size();
 }
+*/
 
 void ReconstructionOE::generateNextState(){
     // generate a new state
@@ -330,7 +339,7 @@ void ReconstructionOE::generateNextState(){
         Int_t voxelOfEventOld = beforeEquilibrium.at(0).voxelOrigin.at(randomEvent);
 
         // randomly select a new voxel v' for event n
-        Int_t voxelOfEventNew = Int_t(distributionVoxels(generate));
+        Int_t voxelOfEventNew = Int_t(distributionVoxels(generate));    
 
         // if they are the same, then don't do anything
         if (voxelOfEventNew == voxelOfEventOld){
@@ -363,6 +372,7 @@ void ReconstructionOE::checkValidity(){
     }
 }
 
+/*
 void ReconstructionOE::plotActivity(){
     // show results of the activity
 
@@ -522,6 +532,7 @@ void ReconstructionOE::createA_v(){
     A_v->GetZaxis()->SetTitleOffset(1.5);
     A_v->SetNdivisions(std::max(5.0, 0.5 * A_vBinsZ), "Z");
 }
+*/
 
 // ##### CALCULATION FUNCTIONS #####
 void ReconstructionOE::calculateActivity(){
@@ -547,6 +558,7 @@ Double_t ReconstructionOE::calculateTransitionProbability(){
     return probability;
 }
 
+/*
 // ##### ROOT #####
 void OE(){
     TBenchmark b;
@@ -576,3 +588,4 @@ int main(){
     return 0;
 }
 #endif
+*/

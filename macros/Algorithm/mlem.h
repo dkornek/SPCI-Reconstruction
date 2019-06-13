@@ -2,6 +2,7 @@
 
 #pragma once
 #include <TH2.h>
+#include <TH3.h>
 #include <TBenchmark.h>
 #include <TCanvas.h>
 #include <TGraph.h>
@@ -12,7 +13,7 @@
 #include "utilities.h"
 
 
-const Bool_t normalizeSpectra = kTRUE;
+const Bool_t normalizeSpectra = kFALSE;
 
 // ##### RESULTS #####
 class ResultsMLEM{

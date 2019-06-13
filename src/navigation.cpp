@@ -161,11 +161,11 @@ TemplateMenu* ReconstructionMenu::getNextMenu(bool& isQuitOptionSelected){
         break;
 
     case 2:
-//        pathToMeasurements = promptPath("TYPE PATH TO MEASUREMENTS FILE: ");
-        pathToMeasurements = "../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36.root";
+        pathToMeasurements = promptPath("TYPE PATH TO MEASUREMENTS FILE: ");
+//        pathToMeasurements = "../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36.root";
 
-//        pathToProjections = promptPath("TYPE PATH TO PROJECTIONS FILE: ");
-        pathToProjections = "../data/SystemMatrix/Bins50/SPCIBase49.root";
+        pathToProjections = promptPath("TYPE PATH TO PROJECTIONS FILE: ");
+//        pathToProjections = "../data/SystemMatrix/Bins50/SPCIBase49.root";
 
         nextMenu = new AlgorithmMenu(pathToMeasurements, pathToProjections);
         break;

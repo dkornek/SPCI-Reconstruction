@@ -90,6 +90,7 @@ void DetectorSize(){
 
     // open measurements file
     TString pathToMeasurement = "../folder/subfolder/measurement.root";
+    pathToMeasurement = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36.root";
     TFile* input = new TFile(pathToMeasurement, "READ");
     if (!input->IsOpen()){
         std::cout << "Measurement file not found!\n";
@@ -97,7 +98,7 @@ void DetectorSize(){
     }
 
     // open file for saving new detector arrangement
-    TFile* output = new TFile("*.root", "RECREATE");
+    TFile* output = new TFile("SourcePos0+24+26+36_NewDesignNarrow.root", "RECREATE");
     if (!output->IsOpen()){
         std::cout << "Output file could not be created!\n";
         return;
@@ -105,7 +106,7 @@ void DetectorSize(){
 
     // choose detectors to be considered
     TList* spectraList = createEmptySpectraList(input);
-    std::vector<Int_t> detectorID = { };  // change here!
+    std::vector<Int_t> detectorID = { 0, 2, 8, 10 };  // change here!
 
     // add spectra to list
     addSpectraToList(input, spectraList, detectorID);
@@ -132,3 +133,9 @@ void DetectorSize(){
 
 // ##### 3 x 3 DETECTOR #####
 // 0, 1, 2, 4, 5, 6, 8, 9, 10
+
+// ##### NEW DESIGN BROAD #####
+// 0, 3, 12, 15
+
+// ##### NEW DESIGN NARROW #####
+// 0, 2, 8, 10
