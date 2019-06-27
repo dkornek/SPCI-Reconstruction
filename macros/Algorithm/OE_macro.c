@@ -16,9 +16,9 @@ void OE_macro(){
 
     // Specify the location of the measurement file
     TString pathToMeasurements = "../folder/subfolder/*.root";
-//    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0.root";
+    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36.root";
-    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36_NewDesignBroad.root";
+//    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36_NewDesignBroad.root";
 
     // Specify the location of the projections file
     TString pathToProjection = "../folder/subfolder/*.root";
@@ -28,7 +28,7 @@ void OE_macro(){
     ReconstructionOE* reco = new ReconstructionOE(pathToMeasurements,
                                                   pathToProjection,
                                                   {-30, 30, -30, 30, 5, 15});  // {-50, 50, -50, 50, 5, 10}
-    reco->start(50, 10);
+    reco->start(50, 50);
 
     b.Stop("total");
     std::cout << "\nTotal Time:\t\t" << b.GetRealTime("total") << " seconds\n";

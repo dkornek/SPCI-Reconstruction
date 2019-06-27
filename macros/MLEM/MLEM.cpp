@@ -115,6 +115,10 @@ void Measurements::createN_dcb(){
                      numberOfBins, 0, numberOfBins);
 
     fillN_dcb(normalizeSpectra);
+
+    TCanvas* canvasN = new TCanvas("N_dcbCanvas", "Measurements", 600, 600);
+    N_dcb->Draw("BOX2Z");
+    canvasN->Update();
 }
 
 void Measurements::getNumbers(){
@@ -742,20 +746,20 @@ void MLEM(){
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos24.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos48.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos6.root";
-    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36.root";
+//    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourceCross.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase49/Bins50/SourceDiagonal.root";
 
 //    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins50/SourceSquare.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins50/Source0.root";
-//    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins50/Source20.root";
+    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins50/Source20.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins50/SourceH.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins700/SourceHZDR.root";
 //    pathToMeasurements = "../../data/Measurements/SPCIBase441/Bins700/SourceH.root";
 
     // Specify the location of the projections file
     TString pathToProjection = "../folder/subfolder/*.root";
-    pathToProjection = "../../data/SystemMatrix/Bins50/SPCIBase49.root";
+    pathToProjection = "../../data/SystemMatrix/Original/SPCIBase49_120.root";
 //    pathToProjection = "../../data/SystemMatrix/Bins50/SPCIBase441.root";
 //    pathToProjection = "../../data/SystemMatrix/Original/SPCIBase441.root";
 
