@@ -16,8 +16,10 @@ public:
     State(const TH3F* N_dcb);
     ~State(){}
 
-    void generateRandomOrigins(const Int_t numberOfVoxels, const TList* systemMatrix);
-    void MCMCNextState(const TList* systemMatrix, const std::vector<Double_t> sensitivies);
+    void generateRandomOrigins(const Int_t numberOfVoxels,
+                               const std::vector<std::vector<std::vector<std::vector<Double_t> > > > systemMatrix);
+    void MCMCNextState(const std::vector<std::vector<std::vector<std::vector<Double_t> > > > systemMatrix,
+                       const std::vector<Double_t> sensitivities);
 
     // ##### MEMBERS #####
     std::vector<Int_t> events;                  // events n from 1 ... N
@@ -25,15 +27,10 @@ public:
     std::vector<std::array<Int_t, 3>> bin;      // bin (d/c/bin) of event n
 
     std::vector<Int_t> countsInVoxel;           // counts C_sv in voxel v
-
-private:
-    Double_t calculateTransitionProbability(const TList* systemMatrix, const std::vector<Double_t> sensitivies,
-                                            const Int_t numberOfEvent,
-                                            const Int_t originOld, const Int_t originNew);
 };
 
 State::State(const TH3F *N_dcb){
-    // fill the events- and bin-vector
+    // fill the events- and bin-vector in pseudo-list-mode format
 
     Int_t detD = N_dcb->GetNbinsX();
     Int_t detC = N_dcb->GetNbinsY();
@@ -57,7 +54,8 @@ State::State(const TH3F *N_dcb){
     }
 }
 
-void State::generateRandomOrigins(const Int_t numberOfVoxels, const TList *systemMatrix){
+void State::generateRandomOrigins(const Int_t numberOfVoxels,
+                                  const std::vector<std::vector<std::vector<std::vector<Double_t> > > > systemMatrix){
     // generate random origins for each event
     // function is used to generate inital state s_0 for OE algorithm
 
@@ -75,19 +73,28 @@ void State::generateRandomOrigins(const Int_t numberOfVoxels, const TList *syste
     // uniform distribution
     std::uniform_real_distribution<Double_t> uniDisVox(0, numberOfVoxels);
 
+    // accelerate by drawing random numbers in advance
+    std::vector<Int_t> randomOrigins;
     for (UInt_t n = 0; n < events.size(); ++n){
+        Int_t origin = Int_t(uniDisVox(generate));
+        randomOrigins.push_back(origin);
+    }
 
-        Int_t origin;
+    for (UInt_t n = 0; n < events.size(); ++n){
+        // draw random origin
+
+        Int_t origin = randomOrigins[n];
         while (true){
             // system matrix element must be > 0
 
-            origin = Int_t(uniDisVox(generate));
-            TH3F* p_dcb = (TH3F*)systemMatrix->At(origin);
-            Double_t probability = p_dcb->GetBinContent(bin.at(n)[0], bin.at(n)[1], bin.at(n)[2]);
+            std::array<Int_t, 3> b = bin[n];
+            Double_t probability = systemMatrix.at(origin).at(b[0] - 1).at(b[1] - 1).at(b[2] - 1);
 
             if (probability > 0){
                 break;
             }
+
+            origin = Int_t(uniDisVox(generate));
         }
 
         origins.push_back(origin);
@@ -95,7 +102,8 @@ void State::generateRandomOrigins(const Int_t numberOfVoxels, const TList *syste
     }
 }
 
-void State::MCMCNextState(const TList *systemMatrix, const std::vector<Double_t> sensitivies){
+void State::MCMCNextState(const std::vector<std::vector<std::vector<std::vector<Double_t> > > > systemMatrix,
+                          const std::vector<Double_t> sensitivities){
     // generate new state in Marcov Chain Monte Carlo manner
 
     // ##### PREPARATION #####
@@ -116,92 +124,75 @@ void State::MCMCNextState(const TList *systemMatrix, const std::vector<Double_t>
     // uniform distribution for transition of state
     std::uniform_real_distribution<Double_t> uniDisTrans(0, 1);
 
+    // ##### GENERATE RANDOM NUMBERS #####
+    // accelerate by drawing random numbers in advance
+    std::vector<Int_t> randomEvents;
+    std::vector<Int_t> randomOrigins;
+    std::vector<Double_t> transitionChances;
+    for (UInt_t n = 0; n < numberOfEvents; ++n){
+        Int_t randomEvent = Int_t(uniDisEv(generate));
+        randomEvents.push_back(randomEvent);
+
+        Int_t randomOrigin = Int_t(uniDisVox(generate));
+        randomOrigins.push_back(randomOrigin);
+
+        Double_t transitionChance = uniDisTrans(generate);
+        transitionChances.push_back(transitionChance);
+    }
+
     // ##### NEXT STATE #####
     Double_t successfulTransitions = 0;
     for (UInt_t n = 0; n < numberOfEvents; ++n){
 
         // randomly select event n
-        Int_t randomEvent = Int_t(uniDisEv(generate));
+        Int_t randomEvent = randomEvents[n];
 
         // origin v of random event n
-        Int_t originOfRandomEvent = origins.at(randomEvent);
+        Int_t originFrom = origins[randomEvent];
 
         // randomly select new origin v' for event n
-        Int_t nextOrigin = Int_t(uniDisVox(generate));
+        Int_t originTo = randomOrigins[n];
 
-        if (nextOrigin == originOfRandomEvent){
+        if (originTo == originFrom){
             // if the origins are the same, continue the loop
             continue;
         }
 
         // calculate transition probability
-        Double_t transitionProbability = calculateTransitionProbability(systemMatrix, sensitivies,
-                                                                        randomEvent,
-                                                                        originOfRandomEvent, nextOrigin);
+        std::array<Int_t, 3> b = bin.at(randomEvent);
+        Double_t p_dcbvFrom = systemMatrix.at(originFrom).at(b[0] - 1).at(b[1] - 1).at(b[2] - 1);
+        Double_t C_svFrom = countsInVoxel[originFrom];
+        Double_t sensitivityFrom = sensitivities.at(originFrom);
+
+        Double_t p_dcbvTo = systemMatrix.at(originTo).at(b[0] - 1).at(b[1] - 1).at(b[2] - 1);
+        Double_t C_svTo = countsInVoxel[originTo];
+        Double_t sensitivityTo = sensitivities.at(originTo);
+
+        // Sitek, Statistical Computing in Nuclear Imaging, 2015, Equation (6.32)
+         Double_t ratio = (p_dcbvTo * (C_svTo + 1) * sensitivityFrom) / (p_dcbvFrom * C_svFrom * sensitivityTo);
+
+        // Sitek, Statistical Computing in Nuclear Imaging, 2015, Equation (6.39)
+        // Double_t ratio = ((p_dcbvTo * sensitivityFrom) / (p_dcbvFrom * sensitivityTo)) * std::pow((C_svTo + 1) / C_svFrom, 0.5) ;
+
+        // Sitek, 2011, Eq. (7)
+        // Double_t ratio = (p_dcbvTo / p_dcbvFrom) * (sensitivityFrom / sensitivityTo) * ((C_svTo + 1) / (C_svFrom - 1))
+        //         * std::pow((C_svFrom - 1) / C_svFrom, C_svFrom)
+        //         * std::pow((C_svTo + 1) / C_svTo, C_svTo);
+
+        Double_t transitionProbability = std::min(1.0, ratio);
 
         // draw random chance of transition
-        Double_t chance = uniDisTrans(generate);
+        Double_t chance = transitionChances[n];
 
         // move origin to new origin if successful
         if (chance <= transitionProbability){
 
-            origins.at(randomEvent) = nextOrigin;
-            --countsInVoxel[originOfRandomEvent];
-            ++countsInVoxel[nextOrigin];
+            origins.at(randomEvent) = originTo;
+            --countsInVoxel[originFrom];
+            ++countsInVoxel[originTo];
             ++successfulTransitions;
         }
     }
 
     std::cout << successfulTransitions/numberOfEvents << "\n";
-}
-
-Double_t State::calculateTransitionProbability(const TList *systemMatrix, const std::vector<Double_t> sensitivies,
-                                               const Int_t numberOfEvent,
-                                               const Int_t originOld, const Int_t originNew){
-    // calculate transition probability (see Eq. (7) in A. SITEK, 2011)
-
-    // PREVIOUS STATE
-    // system matrix probability
-    TH3F* p_dcbOld = (TH3F*)systemMatrix->At(originOld);
-    Double_t p_dcbvOld = p_dcbOld->GetBinContent(bin.at(numberOfEvent)[0],
-                                                 bin.at(numberOfEvent)[1],
-                                                 bin.at(numberOfEvent)[2]);
-
-    // counts in voxel
-    Double_t C_svOld = countsInVoxel.at(originOld);
-
-    // sensitivity
-    Double_t p_vOld = sensitivies.at(originOld);
-
-    // NEXT STATE
-    // system matrix probability
-    TH3F* p_dcbNew = (TH3F*)systemMatrix->At(originNew);
-    Double_t p_dcbvNew = p_dcbNew->GetBinContent(bin.at(numberOfEvent)[0],
-                                                 bin.at(numberOfEvent)[1],
-                                                 bin.at(numberOfEvent)[2]);
-
-    // counts in voxel
-    Double_t C_svNew = countsInVoxel.at(originNew);
-
-    // sensitivity
-    Double_t p_vNew = sensitivies.at(originNew);
-
-    // CALCULATE THE PROBABILITY
-    Double_t lambda = (p_dcbvNew / p_dcbvOld) * (p_vOld / p_vNew);
-
-    Double_t kappa = (C_svNew + 1) / (C_svOld - 1);
-
-    // countsRatioOld/-New are nearly 1 and can thus be neglected (losing some precision)
-//    Double_t countsRatioOld = (C_svOld - 1) / C_svOld;
-//    countsRatioOld = std::pow(countsRatioOld, C_svOld);
-
-//    Double_t countsRatioNew = (C_svNew + 1) / C_svNew;
-//    countsRatioNew = std::pow(countsRatioNew, C_svNew);
-
-//    Double_t probability = lambda * kappa * countsRatioNew * countsRatioOld;
-
-    Double_t probability = lambda * kappa;
-    probability = std::min(1.0, probability);
-
-    return probability;
 }

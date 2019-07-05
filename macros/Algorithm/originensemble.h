@@ -15,6 +15,7 @@
 #include "utilities.h"
 
 
+// Must be kFALSE at ALL TIMES
 const Bool_t normalizeSpectra = kFALSE;
 
 // ##### RESULTS #####
@@ -31,22 +32,29 @@ private:
     TCanvas* canvas;
     TPad* plot3D;
     TPad* plot2D;
+    TPad* transitions;
 };
 
 ResultsOE::ResultsOE(){
-    canvas = new TCanvas("results", "Image Reconstruction", 10, 10, 900, 450);
+    canvas = new TCanvas("results", "Image Reconstruction", 10, 10, 1350, 450);
     canvas->cd();
 
-    plot3D = new TPad("activity3D", "3D Activity Distribution", 0.01, 0.01, 0.50, 0.99);
+    plot3D = new TPad("activity3D", "3D Distribution of Emission Density", 0.01, 0.01, 0.33, 0.99);
     plot3D->Draw();
 
-    plot2D = new TPad("activity2d", "2D Projection", 0.51, 0.01, 0.99, 0.99);
+    plot2D = new TPad("activity2d", "2D Projection", 0.34, 0.01, 0.66, 0.99);
     plot2D->SetRightMargin(0.2);
     plot2D->Draw();
+
+    transitions = new TPad("transitions", "Successful Transitions", 0.67, 0.01, 0.99, 0.99);
+    // transitions->SetLogy();
+    //transitions->SetLogx();
+    transitions->Draw();
 }
 
 ResultsOE::~ResultsOE(){
     delete A_vProject3D;
+    delete transitions;
     delete plot2D;
     delete plot3D;
     delete canvas;
@@ -58,12 +66,12 @@ void ResultsOE::plot(TH3F *A_v){
 
     plot2D->cd();
     A_vProject3D = (TH2F*)A_v->Project3D("yx");
-    A_vProject3D->SetStats(kTRUE);
-    A_vProject3D->SetTitle("2D Projection of 3D Activity Distribution");
+    A_vProject3D->SetStats(kFALSE);
+    A_vProject3D->SetTitle("2D Projection of 3D Emission Density");
 
     A_vProject3D->GetXaxis()->SetTitleOffset(1);
     A_vProject3D->GetYaxis()->SetTitleOffset(1);
-    A_vProject3D->GetZaxis()->SetTitle("Relative Activity");
+    A_vProject3D->GetZaxis()->SetTitle("Counts / 1");
     A_vProject3D->GetZaxis()->SetTitleOffset(1.8);
     A_vProject3D->Draw("COLZ");
 }
@@ -150,7 +158,7 @@ void ReconstructionOE::start(const Int_t numberOfIterationsForEquilibirum, const
     b.Start("stats");
     b.Start("S_0");
     State initalState(measurementData->N_dcb);
-    initalState.generateRandomOrigins(image->numberOfVoxels, systemMatrixData->systemMatrix);
+    initalState.generateRandomOrigins(image->numberOfVoxels, systemMatrixData->systemMatrixVector);
     statesBeforeEquilibrium.push_back(initalState);
     b.Stop("S_0");
     std::cout << "\nS_0 Creation Time:\t" << b.GetRealTime("S_0") << " s\n";
@@ -184,7 +192,7 @@ void ReconstructionOE::reachEquilibrium(const Int_t numberOfIterations){
 
     for (Int_t n = 0; n < numberOfIterations; ++n){
         State nextState = statesBeforeEquilibrium.back();
-        nextState.MCMCNextState(systemMatrixData->systemMatrix, systemMatrixData->sensitivities);
+        nextState.MCMCNextState(systemMatrixData->systemMatrixVector, systemMatrixData->sensitivities);
         statesBeforeEquilibrium.push_back(nextState);
     }
 }
@@ -197,7 +205,7 @@ void ReconstructionOE::sampleEquilibriumStates(const Int_t numberOfIterations){
 
     for (Int_t n = 0; n < numberOfIterations; ++n){
         State nextState = statesInEquilibrium.back();
-        nextState.MCMCNextState(systemMatrixData->systemMatrix, systemMatrixData->sensitivities);
+        nextState.MCMCNextState(systemMatrixData->systemMatrixVector, systemMatrixData->sensitivities);
 
         if (n % 1 == 0){
             // save every state, can be changed according to needs

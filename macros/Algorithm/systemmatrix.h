@@ -24,6 +24,9 @@ public:
     TList* p_dcbvPrime = nullptr;  // systemMatrix x N_dcb
     std::vector<Double_t> sensitivities;
 
+    // vector mode for system matrix: 1) voxel 2) d 3) c 4) bin
+    std::vector<std::vector<std::vector<std::vector<Double_t> > > > systemMatrixVector;
+
 private:
     void getNumbers();
 
@@ -59,25 +62,26 @@ SystemMatrix::~SystemMatrix(){
 }
 
 void SystemMatrix::createSystemMatrix(const Bool_t normalized, const Int_t nDet){
-    // (OE MODE) create list of 3d histograms containing the probabilities for each voxel = system matrix
-
-    systemMatrix = new TList();
+    // (OE MODE) create 4d vector containing the probabilities for each voxel = system matrix
 
     // iterate through all voxels v
     nextVoxel->Reset();
     while ((keyVoxel = (TKey*)nextVoxel->Next())){
+        std::vector<std::vector<std::vector<Double_t> > > p_dcb;
+
+        for (Int_t d = 0; d < nDet; ++d){
+            std::vector<std::vector<Double_t> > p_cb;
+
+            for (Int_t c = 0; c < nDet; ++c){
+                std::vector<Double_t> p_b;
+                p_cb.push_back(p_b);
+            }
+
+            p_dcb.push_back(p_cb);
+        }
+
+        Double_t sensitivity = 0;
         TString nameOfVoxel = keyVoxel->GetName();
-
-        TString description;
-        description.Form("Probabilities to contribute one count to N_dcb from voxel %s", nameOfVoxel.Data());
-
-        TString internalName;
-        internalName.Form("p_dcb_%s", nameOfVoxel.Data());
-        TH3F* p_dcb = new TH3F(internalName, description,
-                               nDet, 0, nDet,
-                               nDet, 0, nDet,
-                               numberOfBins, 0, numberOfBins);
-
         TDirectory* dirOfVoxel = (TDirectory*)systemMatrixFile->Get(nameOfVoxel);
         TIter nextS_dc(dirOfVoxel->GetListOfKeys());
         while ((keyS_dcVoxel = (TKey*)nextS_dc())){
@@ -85,6 +89,10 @@ void SystemMatrix::createSystemMatrix(const Bool_t normalized, const Int_t nDet)
 
             TString nameOfS_dc = keyS_dcVoxel->GetName();
             TH1F* S_dc = (TH1F*)dirOfVoxel->Get(nameOfS_dc);
+
+            // Divide counts by numbers of EMISSIONS (usually unkown) in the voxel to maintain absolute counts
+            S_dc->Scale(1.0 / 5000000);  // Tonis Simulation 20181212_5x5mm2.root with 441 positions
+            // S_dc->Scale(1.0 / 300000);  // Boyanas Experiment with 49 positions
 
             if (normalized){
                 S_dc->Scale(1.0 / S_dc->Integral());
@@ -94,15 +102,18 @@ void SystemMatrix::createSystemMatrix(const Bool_t normalized, const Int_t nDet)
             Int_t detectorC;
             Utilities::getDetectorIndices(nameOfS_dc(3, 4), detectorD, detectorC);
             for (Int_t bin = 1; bin <= numberOfBins; ++bin){
-                p_dcb->SetBinContent(detectorD + 1, detectorC + 1, bin, S_dc->GetBinContent(bin));
+                Double_t binContent = S_dc->GetBinContent(bin);
+                p_dcb.at(detectorD).at(detectorC).push_back(binContent);
+
+                sensitivity += binContent;
             }
 
             delete S_dc;
         }
 
-        systemMatrix->AddLast(p_dcb);
-        sensitivities.push_back(p_dcb->Integral());
         delete dirOfVoxel;
+        sensitivities.push_back(sensitivity);
+        systemMatrixVector.push_back(p_dcb);
     }
 }
 
@@ -133,6 +144,10 @@ void SystemMatrix::createSystemMatrix(const Bool_t normalized, const TH3F *N_dcb
 
             TString nameOfS_dc = keyS_dcVoxel->GetName();
             TH1F* S_dc = (TH1F*)dirOfVoxel->Get(nameOfS_dc);
+
+            // Divide counts by numbers of EMISSIONS (usually unkown) in the voxel to maintain absolute counts
+            S_dc->Scale(1.0 / 5000000);  // Tonis Simulation 20181212_5x5mm2.root with 441 positions
+            // S_dc->Scale(1.0 / 300000);  // Boyanas Experiment with 49 positions
 
             if (normalized){
                 S_dc->Scale(1.0 / S_dc->Integral());

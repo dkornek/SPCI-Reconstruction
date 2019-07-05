@@ -55,7 +55,7 @@ ImageSpace::~ImageSpace(){
 void ImageSpace::createA_v(){
     // create the activity distribution contained in the image space
 
-    A_v = new TH3F("A_v", "3D Activity Distribution",
+    A_v = new TH3F("A_v", "3D Emission Density",
                    numberOfBinsX, imageVolume[0], imageVolume[1],
                    numberOfBinsY, imageVolume[2], imageVolume[3],
                    numberOfBinsZ, imageVolume[4], imageVolume[5]);

@@ -12,7 +12,8 @@
 #include "measurements.h"
 #include "utilities.h"
 
-
+// It should always be kFALSE
+// kTRUE will never work with noise or real measurements
 const Bool_t normalizeSpectra = kFALSE;
 
 // ##### RESULTS #####
@@ -36,7 +37,7 @@ ResultsMLEM::ResultsMLEM(){
     canvas = new TCanvas("results", "Image Reconstruction", 10, 10, 1350, 450);
     canvas->cd();
 
-    plot3D = new TPad("activity3D", "3D Activity Distribution", 0.01, 0.01, 0.33, 0.99);
+    plot3D = new TPad("activity3D", "3D Distribution of Emission Density", 0.01, 0.01, 0.33, 0.99);
     plot3D->Draw();
 
     plot2D = new TPad("activity2d", "2D Projection", 0.34, 0.01, 0.66, 0.99);
@@ -64,11 +65,11 @@ void ResultsMLEM::plot(TH3F *A_v, std::vector<Double_t> xAxis, std::vector<Doubl
     plot2D->cd();
     A_vProject3D = (TH2F*)A_v->Project3D("yx");
     A_vProject3D->SetStats(kFALSE);
-    A_vProject3D->SetTitle("2D Projection of 3D Activity Distribution");
+    A_vProject3D->SetTitle("2D Projection of 3D Emission Density");
 
     A_vProject3D->GetXaxis()->SetTitleOffset(1);
     A_vProject3D->GetYaxis()->SetTitleOffset(1);
-    A_vProject3D->GetZaxis()->SetTitle("Relative Activity");
+    A_vProject3D->GetZaxis()->SetTitle("Counts / 1");
     A_vProject3D->GetZaxis()->SetTitleOffset(1.8);
     A_vProject3D->Draw("COLZ");
 
@@ -201,13 +202,13 @@ void ReconstructionMLEM::start(const Int_t maxNumberOfIterations, const Double_t
             results->plot(image->A_v, chiSquareXaxis, chiSquareYaxis);
         }
 
-        if (numberOfIterations % 5 == 0){
+        if (numberOfIterations % 1 == 0){
             chiSquare = calculateChiSquare();
             chiSquareXaxis.push_back(numberOfIterations + 1);
             chiSquareYaxis.push_back(chiSquare);
         }
 
-        if (numberOfIterations % 5 == 1){
+        if (numberOfIterations % 1 == 1){
             if (calculateChiSquare() / chiSquare >= stoppingCriterion){
                 break;
             }

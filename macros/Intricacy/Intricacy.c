@@ -20,7 +20,7 @@ void getNumberOfDetectorsAndBins(TFile* f, Int_t& nDet, Int_t& nBin){
 
     Int_t nElements = 0.5 * (nDet * (nDet - 1)) * nBin;
     cout << "Number of Detectors:\t\t\t" << nDet <<
-    "\nNumber of Energy Bins:\t\t\t" << nBin << 
+    "\nNumber of Energy Bins:\t\t\t" << nBin <<
     "\nNumber of Measurement Elements:\t\t" << nElements << "\n";
 }
 
@@ -78,31 +78,32 @@ std::vector<std::vector<Double_t> > getSMCoefficients(TFile* f, Int_t nVx, Int_t
         }
     }
 
-    for (Int_t v = 0; v < nVx; ++v){
+    TIter nextVoxel(f->GetListOfKeys());
+    TKey* keyVoxel;
+    while ((keyVoxel = (TKey*)nextVoxel())){
 
-	Int_t indexOfMeasurementElement = 0;
-
-        TString nameOfVoxel;
-        nameOfVoxel.Form("%03i", v);
+        Int_t indexOfMeasurementElement = 0;
+        TString nameOfVoxel = keyVoxel->GetName();
         TDirectory* directoryOfVoxel = (TDirectory*)f->Get(nameOfVoxel);
-	
-        for (Int_t d = 0; d < nDet; ++d){
-            for (Int_t c = d + 1; c < nDet; ++c){
-		
-                TString nameOfSpectrum;
-                nameOfSpectrum.Form("%03i%02i%02i", v, d, c);
-                TH1F* spectrum = (TH1F*)directoryOfVoxel->Get(nameOfSpectrum);
-		for (Int_t b = 1; b <= nBin; ++b){
 
-                    Double_t binContent = spectrum->GetBinContent(b);
-		    SM.at(indexOfMeasurementElement).push_back(binContent);
-                    ++indexOfMeasurementElement;
-                }
-		
-		delete spectrum;
+        TIter nextSpectrum(directoryOfVoxel->GetListOfKeys());
+        TKey* keySpectrum;
+        while ((keySpectrum = (TKey*)nextSpectrum())){
+
+            TH1F* spectrum = (TH1F*)directoryOfVoxel->Get(keySpectrum->GetName());
+            for (Int_t b = 1; b <= nBin; ++b){
+
+                Double_t binContent = spectrum->GetBinContent(b);
+                SM.at(indexOfMeasurementElement).push_back(binContent);
+                ++indexOfMeasurementElement;
             }
+            delete spectrum;
+
         }
-    } 
+        delete keySpectrum;
+
+    }
+    delete keyVoxel;
 
     return SM;
 }
@@ -111,51 +112,42 @@ std::vector<Double_t> calculateSumOfSMCoef(std::vector<std::vector<Double_t> > S
 
     std::vector<Double_t> sumVector;
     std::for_each(SMCoef.begin(), SMCoef.end(), [&] (std::vector<Double_t> c){
-    
+
         Double_t sumOverVoxels = 0;
-	std::for_each(c.begin(), c.end(), [&] (Double_t n){
+        std::for_each(c.begin(), c.end(), [&] (Double_t n){ sumOverVoxels += n;	});
 
-	    sumOverVoxels += n;
-
-	});
-
-	sumVector.push_back(sumOverVoxels);
-    });
+	sumVector.push_back(sumOverVoxels); });
 
     return sumVector;
 }
 
-std::vector<Double_t> calculateIntricacies(std::vector<std::vector<Double_t> > SMCoef, 						   std::vector<Double_t> sumOfSMElements){
+std::vector<Double_t> calculateIntricacies(std::vector<std::vector<Double_t> > SMCoef, std::vector<Double_t> sumOfSMElements){
 
     std::vector<Double_t> zetas;
     Int_t nEl = 0;
     std::for_each(SMCoef.begin(), SMCoef.end(), [&] (std::vector<Double_t> c){
-    
+
         Double_t zeta = 0;
-	
-	Int_t voxel = 0;
-	std::for_each(c.begin(), c.end(), [&] (Double_t n){
+        std::for_each(c.begin(), c.end(), [&] (Double_t n){
 
-	    if (n != 0){
+            if (n != 0){
 
-		Double_t s = sumOfSMElements.at(nEl);
-		if (s != 0){
+                Double_t s = sumOfSMElements.at(nEl);
+                if (s != 0){
 
-		    Double_t z = n / s;
-		    z *= TMath::Log2(z);
-		    zeta += z;
-		}
-	    }
-
-	    ++voxel;
-	});
+                    Double_t z = n / s;
+                    z *= TMath::Log2(z);
+                    zeta += z;
+                }
+            }
+        });
 
 	if (zeta != 0){
 	    zeta *= -1;
 	    zetas.push_back(zeta);
 	}
-	++nEl;
-    });
+
+	++nEl; });
 
     return zetas;
 }
@@ -165,10 +157,7 @@ Double_t calculateMeanZeta(std::vector<Double_t> RORzetas){
     Int_t K = RORzetas.size();
     Double_t meanZeta = 0;
 
-    std::for_each(RORzetas.begin(), RORzetas.end(), [&] (Double_t z){
-
-	meanZeta += z;
-    });
+    std::for_each(RORzetas.begin(), RORzetas.end(), [&] (Double_t z){ meanZeta += z; });
 
     meanZeta = meanZeta / K;
     return meanZeta;
@@ -192,7 +181,6 @@ void Intricacy(){
 
     // get image space info
     Int_t numberOfVoxels = getNumberOfVoxels(input);
-    
 
     // get system matrix info
     Int_t numberOfSMCoefficients = 0.5 * (numberOfDetectors *
@@ -220,8 +208,8 @@ void Intricacy(){
     // calculate ROR intricacies
     cout << "\nCalculate ROR intricacies ...\n";
 
-    std::vector<Double_t> zetaOfMeasurementElements = 
-	calculateIntricacies(SMCoefInMeasurementElements, sumOfME);
+    std::vector<Double_t> zetaOfMeasurementElements =
+        calculateIntricacies(SMCoefInMeasurementElements, sumOfME);
 
     // calculate system intricacy
     cout << "\nCalculate system intricacy ...\n";
@@ -233,18 +221,3 @@ void Intricacy(){
     // shut down macro
     input->Close();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
