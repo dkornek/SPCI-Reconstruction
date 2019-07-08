@@ -64,6 +64,7 @@ void ResultsMLEM::plot(TH3F *A_v, std::vector<Double_t> xAxis, std::vector<Doubl
 
     plot2D->cd();
     A_vProject3D = (TH2F*)A_v->Project3D("yx");
+    A_vProject3D->SetContour(99);
     A_vProject3D->SetStats(kFALSE);
     A_vProject3D->SetTitle("2D Projection of 3D Emission Density");
 
@@ -71,7 +72,7 @@ void ResultsMLEM::plot(TH3F *A_v, std::vector<Double_t> xAxis, std::vector<Doubl
     A_vProject3D->GetYaxis()->SetTitleOffset(1);
     A_vProject3D->GetZaxis()->SetTitle("Counts / 1");
     A_vProject3D->GetZaxis()->SetTitleOffset(1.8);
-    A_vProject3D->Draw("COLZ");
+    A_vProject3D->Draw("CONT4Z");
 
     Int_t n = xAxis.size();
     if (n != 0){

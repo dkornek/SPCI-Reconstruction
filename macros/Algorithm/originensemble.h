@@ -66,6 +66,7 @@ void ResultsOE::plot(TH3F *A_v){
 
     plot2D->cd();
     A_vProject3D = (TH2F*)A_v->Project3D("yx");
+    A_vProject3D->SetContour(99);
     A_vProject3D->SetStats(kFALSE);
     A_vProject3D->SetTitle("2D Projection of 3D Emission Density");
 
@@ -73,7 +74,7 @@ void ResultsOE::plot(TH3F *A_v){
     A_vProject3D->GetYaxis()->SetTitleOffset(1);
     A_vProject3D->GetZaxis()->SetTitle("Counts / 1");
     A_vProject3D->GetZaxis()->SetTitleOffset(1.8);
-    A_vProject3D->Draw("COLZ");
+    A_vProject3D->Draw("CONT4Z");
 }
 
 // ##### RECONSTRUCTION #####
@@ -207,7 +208,7 @@ void ReconstructionOE::sampleEquilibriumStates(const Int_t numberOfIterations){
         State nextState = statesInEquilibrium.back();
         nextState.MCMCNextState(systemMatrixData->systemMatrixVector, systemMatrixData->sensitivities);
 
-        if (n % 1 == 0){
+        if (n % 5 == 0){
             // save every state, can be changed according to needs
             statesInEquilibrium.push_back(nextState);
         }
