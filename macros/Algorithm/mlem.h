@@ -1,4 +1,8 @@
 // mlem.h
+//
+// author: Dominik Kornek <dominik.kornek@gmail.com>
+// last modified: 19-08-27
+
 
 #pragma once
 #include <TH2.h>
@@ -6,6 +10,7 @@
 #include <TBenchmark.h>
 #include <TCanvas.h>
 #include <TGraph.h>
+#include <TStyle.h>
 
 #include "imagespace.h"
 #include "systemmatrix.h"
@@ -13,7 +18,7 @@
 #include "utilities.h"
 
 // It should always be kFALSE
-// kTRUE will never work with noise or real measurements
+// kTRUE will probably never work with noise or real measurements
 const Bool_t normalizeSpectra = kFALSE;
 
 // ##### RESULTS #####
@@ -22,57 +27,90 @@ public:
     ResultsMLEM();
     ~ResultsMLEM();
 
-    void plot(TH3F* A_v, std::vector<Double_t> xAxis, std::vector<Double_t> yAxis);
+    void plotActivity(TH3F* A_v);
+    void plotChiSquare(std::vector<Double_t> xAxis, std::vector<Double_t> yAxis);
+    void plotLogLikelihood(std::vector<Double_t> xAxis, std::vector<Double_t> yAxis);
 
 private:
     TH2F* A_vProject3D = nullptr;
 
-    TCanvas* canvas;
-    TPad* plot3D;
+    TCanvas* canvas2D;
     TPad* plot2D;
+
+    TCanvas* canvasChi;
     TPad* plotChi;
+
+    TCanvas* canvasLogLike;
+    TPad* plotLogLike;
 };
 
 ResultsMLEM::ResultsMLEM(){
-    canvas = new TCanvas("results", "Image Reconstruction", 10, 10, 1350, 450);
-    canvas->cd();
+    canvas2D = new TCanvas("a2d_c", "MLEM Reconstruction", 10, 10, 450, 410);
+    canvas2D->cd();
 
-    plot3D = new TPad("activity3D", "3D Distribution of Emission Density", 0.01, 0.01, 0.33, 0.99);
-    plot3D->Draw();
-
-    plot2D = new TPad("activity2d", "2D Projection", 0.34, 0.01, 0.66, 0.99);
-    plot2D->SetRightMargin(0.2);
+    gStyle->SetPalette(53, 0);
+    plot2D = new TPad("a2d_p", "", 0, 0, 1, 1);
+    plot2D->SetLeftMargin(0.12);
+    plot2D->SetRightMargin(0.22);
+    plot2D->SetBottomMargin(0.12);
     plot2D->Draw();
 
-    plotChi = new TPad("chi", "ChiSquare", 0.67, 0.01, 0.99, 0.99);
+    canvasChi = new TCanvas("chi_c", "Convergence", 500, 10, 450, 450);
+    canvasChi->cd();
+
+    plotChi = new TPad("chi_p", "", 0, 0, 1, 1);
+    plotChi->SetLeftMargin(0.20);
+    plotChi->SetRightMargin(0.03);
+    plotChi->SetBottomMargin(0.12);
     plotChi->SetLogy();
-    plotChi->SetLogx();
     plotChi->Draw();
+
+    canvasLogLike = new TCanvas("log_c", "Convergence", 700, 10, 450, 450);
+    canvasLogLike->cd();
+
+    plotLogLike = new TPad("log_p", "", 0, 0, 1, 1);
+    plotLogLike->SetLeftMargin(0.20);
+    plotLogLike->SetRightMargin(0.03);
+    plotLogLike->SetBottomMargin(0.12);
+    plotLogLike->Draw();
 }
 
 ResultsMLEM::~ResultsMLEM(){
     delete A_vProject3D;
     delete plotChi;
+    delete plotLogLike;
     delete plot2D;
-    delete plot3D;
-    delete canvas;
+    delete canvasChi;
+    delete canvasLogLike;
+    delete canvas2D;
 }
 
-void ResultsMLEM::plot(TH3F *A_v, std::vector<Double_t> xAxis, std::vector<Double_t> yAxis){
-    plot3D->cd();
-    A_v->Draw("BOX2");
-
+void ResultsMLEM::plotActivity(TH3F *A_v){
     plot2D->cd();
     A_vProject3D = (TH2F*)A_v->Project3D("yx");
     A_vProject3D->SetContour(99);
     A_vProject3D->SetStats(kFALSE);
-    A_vProject3D->SetTitle("2D Projection of 3D Emission Density");
+    A_vProject3D->SetTitle("");
 
     A_vProject3D->GetXaxis()->SetTitleOffset(1);
+    A_vProject3D->GetXaxis()->SetNdivisions(5);
+    A_vProject3D->GetXaxis()->SetLabelSize(0.06);
+    A_vProject3D->GetXaxis()->SetTitleSize(0.06);
     A_vProject3D->GetYaxis()->SetTitleOffset(1);
-    A_vProject3D->GetZaxis()->SetTitle("Counts / 1");
-    A_vProject3D->GetZaxis()->SetTitleOffset(1.8);
-    A_vProject3D->Draw("CONT4Z");
+    A_vProject3D->GetYaxis()->SetNdivisions(5);
+    A_vProject3D->GetYaxis()->SetLabelSize(0.06);
+    A_vProject3D->GetYaxis()->SetTitleSize(0.06);
+    A_vProject3D->GetZaxis()->SetLabelSize(0.06);
+    A_vProject3D->GetZaxis()->SetTitleOffset(1.5);
+    A_vProject3D->GetZaxis()->SetNdivisions(4);
+    A_vProject3D->GetZaxis()->SetMaxDigits(2);
+    A_vProject3D->GetZaxis()->SetTitle("Probability");
+    A_vProject3D->GetZaxis()->SetTitleSize(0.06);
+    A_vProject3D->Draw("COLZ");
+    canvas2D->Update();
+}
+
+void ResultsMLEM::plotChiSquare(std::vector<Double_t> xAxis, std::vector<Double_t> yAxis){
 
     Int_t n = xAxis.size();
     if (n != 0){
@@ -81,11 +119,39 @@ void ResultsMLEM::plot(TH3F *A_v, std::vector<Double_t> xAxis, std::vector<Doubl
 
         plotChi->cd();
         TGraph* graph = new TGraph(n, x, y);
-        graph->SetTitle("#chi^{2}-Statistics;Number of iterations;#chi^{2}");
-        graph->Draw("AL*");
-    }
+        graph->GetXaxis()->SetLabelSize(0.06);
+        graph->GetXaxis()->SetTitleSize(0.06);
+        graph->GetYaxis()->SetLabelSize(0.06);
+        graph->GetYaxis()->SetTitleSize(0.06);
+        graph->GetYaxis()->SetMaxDigits(2);
 
-    canvas->Update();
+        graph->SetMarkerStyle(5);
+        graph->SetTitle(";Number of iterations;#chi^{2}");
+        graph->Draw("AL");
+        canvasChi->Update();
+    }
+}
+
+void ResultsMLEM::plotLogLikelihood(std::vector<Double_t> xAxis, std::vector<Double_t> yAxis){
+
+    Int_t n = xAxis.size();
+    if (n != 0){
+        Double_t* x = &xAxis[0];
+        Double_t* y = &yAxis[0];
+
+        plotLogLike->cd();
+        TGraph* graph = new TGraph(n, x, y);
+        graph->GetXaxis()->SetLabelSize(0.06);
+        graph->GetXaxis()->SetTitleSize(0.06);
+        graph->GetYaxis()->SetLabelSize(0.06);
+        graph->GetYaxis()->SetTitleSize(0.06);
+        graph->GetYaxis()->SetMaxDigits(2);
+
+        graph->SetMarkerStyle(5);
+        graph->SetTitle(";Number of iterations;-log L(#lambda)");
+        graph->Draw("AL");
+        canvasLogLike->Update();
+    }
 }
 
 // ##### RECONSTRUCTION #####
@@ -96,7 +162,7 @@ public:
                        const std::vector<Double_t> volume);
     ~ReconstructionMLEM();
 
-    void start(const Int_t maxNumberOfIterations, const Double_t stoppingCriterion);
+    void start(const Int_t maxNumberOfIterations);
     void setAccelerator(const Double_t a){accelerator = a;}
 
 private:
@@ -109,6 +175,7 @@ private:
     void backprojection();
 
     Double_t calculateChiSquare();
+    Double_t calculateLogLike();
 
     // ##### MEMBERS #####
     Bool_t isCalculationValid;
@@ -174,7 +241,7 @@ ReconstructionMLEM::~ReconstructionMLEM(){
     delete results;
 }
 
-void ReconstructionMLEM::start(const Int_t maxNumberOfIterations, const Double_t stoppingCriterion){
+void ReconstructionMLEM::start(const Int_t maxNumberOfIterations){
     // execute the calculation
 
     if (!isCalculationValid){
@@ -186,6 +253,10 @@ void ReconstructionMLEM::start(const Int_t maxNumberOfIterations, const Double_t
     Double_t chiSquare = 0;
     std::vector<Double_t> chiSquareXaxis;
     std::vector<Double_t> chiSquareYaxis;
+
+    Double_t logLike = 0;
+    std::vector<Double_t> logLikeXaxis;
+    std::vector<Double_t> logLikeYaxis;
 
     results = new ResultsMLEM();
 
@@ -199,20 +270,14 @@ void ReconstructionMLEM::start(const Int_t maxNumberOfIterations, const Double_t
 
         calculate();
 
-        if (numberOfIterations % 10 == 0){
-            results->plot(image->A_v, chiSquareXaxis, chiSquareYaxis);
-        }
-
         if (numberOfIterations % 1 == 0){
             chiSquare = calculateChiSquare();
             chiSquareXaxis.push_back(numberOfIterations + 1);
             chiSquareYaxis.push_back(chiSquare);
-        }
 
-        if (numberOfIterations % 1 == 1){
-            if (calculateChiSquare() / chiSquare >= stoppingCriterion){
-                break;
-            }
+            logLike = calculateLogLike();
+            logLikeXaxis.push_back(numberOfIterations + 1);
+            logLikeYaxis.push_back(logLike);
         }
 
         ++numberOfIterations;
@@ -223,7 +288,10 @@ void ReconstructionMLEM::start(const Int_t maxNumberOfIterations, const Double_t
     std::cout << "\nImage reconstruction done. Steps: " << numberOfIterations << "\n";
     std::cout << "\nCalculation Time:\t" << b.GetRealTime("stats") << " seconds\n";
 
-    results->plot(image->A_v, chiSquareXaxis, chiSquareYaxis);
+    image->A_v->Scale(1.0 / image->A_v->Integral());
+    results->plotActivity(image->A_v);
+    results->plotChiSquare(chiSquareXaxis, chiSquareYaxis);
+    results->plotLogLikelihood(logLikeXaxis, logLikeYaxis);
 }
 
 // ##### PREPARATION FUNCTIONS #####
@@ -302,8 +370,7 @@ void ReconstructionMLEM::backprojection(){
 }
 
 Double_t ReconstructionMLEM::calculateChiSquare(){
-    // The Chi²-statistics is used to stop the MLEM algorithm before convergence
-    // The curve is monotonically decreasing -> Change of rate is proportional to convergence
+    // Calculate the Chi Square Statistics
 
     Double_t ChiSquareTestVariable = 0.0;
     for (Int_t d = 1; d <= measurementData->numberOfDetectors; ++d){
@@ -327,4 +394,27 @@ Double_t ReconstructionMLEM::calculateChiSquare(){
     }
 
     return ChiSquareTestVariable;
+}
+
+Double_t ReconstructionMLEM::calculateLogLike(){
+    // Calculate the Log-Likelihood-Function
+
+    Double_t LogLike = 0.0;
+    for (Int_t d = 1; d <= measurementData->numberOfDetectors; ++d){
+        for (Int_t c = 1; c <= measurementData->numberOfDetectors; ++c){
+            for (Int_t bin = 1; bin <= measurementData->numberOfBins; ++bin){
+
+                Double_t projectionBinContent = projections->GetBinContent(d, c, bin);
+                if (projectionBinContent != 0){
+
+                    Double_t N_dcbBinContent = measurementData->N_dcb->GetBinContent(d, c, bin);
+                    Double_t summand = projectionBinContent - N_dcbBinContent * std::log(projectionBinContent);
+
+                    LogLike += summand;
+                }
+            }
+        }
+    }
+
+    return LogLike;
 }

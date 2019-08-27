@@ -1,8 +1,8 @@
-// ROOT Macro using the Maximum Likelihood Expectation Maximization algorithm for SPCI-Reconstruction
-// Standardization is used = faster convergence rate
-
+// utilities.h
+// Some handy functions that are used by both ML-EM and OE
+//
 // author: Dominik Kornek <dominik.kornek@gmail.com>
-// last modified: 19-05-27
+// last modified: 19-08-27
 
 
 #pragma once

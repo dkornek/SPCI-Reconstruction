@@ -1,4 +1,8 @@
 // systemmatrix.h
+//
+// author: Dominik Kornek <dominik.kornek@gmail.com>
+// last modified: 19-08-27
+
 
 #pragma once
 #include <TH3.h>
@@ -13,8 +17,8 @@ public:
     SystemMatrix(const TString pathToProjections);
     ~SystemMatrix();
 
-    void createSystemMatrix(const Bool_t normalized, const Int_t nDet);
-    void createSystemMatrix(const Bool_t normalized, const TH3F* N_dcb, const Int_t nDet);
+    void createSystemMatrix(const Int_t nDet);  // OE
+    void createSystemMatrix(const Bool_t normalized, const TH3F* N_dcb, const Int_t nDet);  // MLEM
     void createP_dcbvPrime(const TH3F* N_dcb);
 
     Int_t numberOfBins;
@@ -61,7 +65,7 @@ SystemMatrix::~SystemMatrix(){
     delete systemMatrixFile;
 }
 
-void SystemMatrix::createSystemMatrix(const Bool_t normalized, const Int_t nDet){
+void SystemMatrix::createSystemMatrix(const Int_t nDet){
     // (OE MODE) create 4d vector containing the probabilities for each voxel = system matrix
 
     // iterate through all voxels v
@@ -91,12 +95,7 @@ void SystemMatrix::createSystemMatrix(const Bool_t normalized, const Int_t nDet)
             TH1F* S_dc = (TH1F*)dirOfVoxel->Get(nameOfS_dc);
 
             // Divide counts by numbers of EMISSIONS (usually unkown) in the voxel to maintain absolute counts
-            S_dc->Scale(1.0 / 5000000);  // Tonis Simulation 20181212_5x5mm2.root with 441 positions
-            // S_dc->Scale(1.0 / 300000);  // Boyanas Experiment with 49 positions
-
-            if (normalized){
-                S_dc->Scale(1.0 / S_dc->Integral());
-            }
+            S_dc->Scale(1.0 / 5000000);  // Tonis Simulation 20181212_5x5mm2.root with 441 positions, solid angle correction not considered
 
             Int_t detectorD;
             Int_t detectorC;
@@ -146,10 +145,12 @@ void SystemMatrix::createSystemMatrix(const Bool_t normalized, const TH3F *N_dcb
             TH1F* S_dc = (TH1F*)dirOfVoxel->Get(nameOfS_dc);
 
             // Divide counts by numbers of EMISSIONS (usually unkown) in the voxel to maintain absolute counts
-            S_dc->Scale(1.0 / 5000000);  // Tonis Simulation 20181212_5x5mm2.root with 441 positions
-            // S_dc->Scale(1.0 / 300000);  // Boyanas Experiment with 49 positions
+            S_dc->Scale(1.0 / 5000000);  // Tonis Simulation 20181212_5x5mm2.root with 441 positions, solid angle correction not considered
 
             if (normalized){
+                // faster converge because distant detectors, which have more precise position information, get more weight
+                // only working for MLEM
+
                 S_dc->Scale(1.0 / S_dc->Integral());
             }
 
@@ -174,7 +175,7 @@ void SystemMatrix::createSystemMatrix(const Bool_t normalized, const TH3F *N_dcb
 }
 
 void SystemMatrix::createP_dcbvPrime(const TH3F *N_dcb){
-    // Multiply p_dcbv * N_dcb to reduce computation time
+    // Multiply p_dcbv * N_dcb once to reduce computation time during iterations
 
     p_dcbvPrime = new TList();
 

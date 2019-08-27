@@ -1,4 +1,8 @@
 // originensemble.h
+//
+// author: Dominik Kornek <dominik.kornek@gmail.com>
+// last modified: 19-08-27
+
 
 #pragma once
 #include <vector>
@@ -7,6 +11,7 @@
 #include <TBenchmark.h>
 #include <TCanvas.h>
 #include <TGraph.h>
+#include <TStyle.h>
 
 #include "imagespace.h"
 #include "systemmatrix.h"
@@ -15,9 +20,6 @@
 #include "utilities.h"
 
 
-// Must be kFALSE at ALL TIMES
-const Bool_t normalizeSpectra = kFALSE;
-
 // ##### RESULTS #####
 class ResultsOE{
 public:
@@ -25,56 +27,92 @@ public:
     ~ResultsOE();
 
     void plot(TH3F* A_v);
+    void plotTransitions(std::vector<Double_t> xAxis, std::vector<Double_t> yAxis);
 
 private:
     TH2F* A_vProject3D = nullptr;
 
-    TCanvas* canvas;
-    TPad* plot3D;
+    TCanvas* canvas2D;
     TPad* plot2D;
-    TPad* transitions;
+
+    TCanvas* canvasTrans;
+    TPad* plotTrans;
 };
 
 ResultsOE::ResultsOE(){
-    canvas = new TCanvas("results", "Image Reconstruction", 10, 10, 1350, 450);
-    canvas->cd();
+    canvas2D = new TCanvas("a2d_c", "OE Reconstruction", 10, 100, 450, 410);
+    canvas2D->cd();
 
-    plot3D = new TPad("activity3D", "3D Distribution of Emission Density", 0.01, 0.01, 0.33, 0.99);
-    plot3D->Draw();
-
-    plot2D = new TPad("activity2d", "2D Projection", 0.34, 0.01, 0.66, 0.99);
-    plot2D->SetRightMargin(0.2);
+    gStyle->SetPalette(53, 0);
+    plot2D = new TPad("a2d_p", "", 0, 0, 1, 1);
+    plot2D->SetLeftMargin(0.12);
+    plot2D->SetRightMargin(0.22);
+    plot2D->SetBottomMargin(0.12);
     plot2D->Draw();
 
-    transitions = new TPad("transitions", "Successful Transitions", 0.67, 0.01, 0.99, 0.99);
-    // transitions->SetLogy();
-    //transitions->SetLogx();
-    transitions->Draw();
+    canvasTrans = new TCanvas("trans_c", "Transitions", 500, 100, 450, 450);
+    canvasTrans->cd();
+
+    plotTrans = new TPad("trans_p", "", 0, 0, 1, 1);
+    plotTrans->SetLeftMargin(0.20);
+    plotTrans->SetRightMargin(0.03);
+    plotTrans->SetBottomMargin(0.12);
+    plotTrans->Draw();
 }
 
 ResultsOE::~ResultsOE(){
     delete A_vProject3D;
-    delete transitions;
+    delete plotTrans;
     delete plot2D;
-    delete plot3D;
-    delete canvas;
+    delete canvasTrans;
+    delete canvas2D;
 }
 
 void ResultsOE::plot(TH3F *A_v){
-    plot3D->cd();
-    A_v->Draw("BOX2");
-
     plot2D->cd();
     A_vProject3D = (TH2F*)A_v->Project3D("yx");
+    A_vProject3D->Smooth(1, "k3a");
     A_vProject3D->SetContour(99);
     A_vProject3D->SetStats(kFALSE);
-    A_vProject3D->SetTitle("2D Projection of 3D Emission Density");
+    A_vProject3D->SetTitle("");
 
     A_vProject3D->GetXaxis()->SetTitleOffset(1);
+    A_vProject3D->GetXaxis()->SetNdivisions(5);
+    A_vProject3D->GetXaxis()->SetLabelSize(0.06);
+    A_vProject3D->GetXaxis()->SetTitleSize(0.06);
     A_vProject3D->GetYaxis()->SetTitleOffset(1);
-    A_vProject3D->GetZaxis()->SetTitle("Counts / 1");
-    A_vProject3D->GetZaxis()->SetTitleOffset(1.8);
-    A_vProject3D->Draw("CONT4Z");
+    A_vProject3D->GetYaxis()->SetNdivisions(5);
+    A_vProject3D->GetYaxis()->SetLabelSize(0.06);
+    A_vProject3D->GetYaxis()->SetTitleSize(0.06);
+    A_vProject3D->GetZaxis()->SetTitle("Probability");
+    A_vProject3D->GetZaxis()->SetTitleOffset(1.5);
+    A_vProject3D->GetZaxis()->SetNdivisions(3);
+    A_vProject3D->GetZaxis()->SetLabelSize(0.06);
+    A_vProject3D->GetZaxis()->SetTitleSize(0.06);
+    A_vProject3D->GetZaxis()->SetMaxDigits(2);
+
+    A_vProject3D->Draw("COLZ");
+    canvas2D->Update();
+}
+
+void ResultsOE::plotTransitions(std::vector<Double_t> xAxis, std::vector<Double_t> yAxis){
+    Int_t n = xAxis.size();
+    if (n != 0){
+        Double_t* x = &xAxis[0];
+        Double_t* y = &yAxis[0];
+
+        plotTrans->cd();
+        TGraph* graph = new TGraph(n, x, y);
+
+        graph->SetTitle(";Number of iterations;Rel. Number of Transitions");
+        graph->GetXaxis()->SetLabelSize(0.06);
+        graph->GetXaxis()->SetTitleSize(0.06);
+        graph->GetYaxis()->SetLabelSize(0.06);
+        graph->GetYaxis()->SetTitleSize(0.06);
+
+        graph->Draw("AL");
+        canvasTrans->Update();
+    }
 }
 
 // ##### RECONSTRUCTION #####
@@ -95,10 +133,9 @@ private:
 
     // ##### MEMBERS #####
     Bool_t isCalculationValid;
+    std::vector<std::vector<Int_t> > countsInVoxelsOfStates;
 
-    std::vector<State> statesBeforeEquilibrium;
-    std::vector<State> statesInEquilibrium;
-
+    State* state = nullptr;
     Measurements* measurementData = nullptr;
     SystemMatrix* systemMatrixData = nullptr;
     ImageSpace* image = nullptr;
@@ -116,7 +153,7 @@ ReconstructionOE::ReconstructionOE(const TString pathToMeasurements,
     b.Start("N_dcb");
     measurementData = new Measurements(pathToMeasurements);
     measurementData->createN_dcb();
-    measurementData->fillN_dcb(normalizeSpectra);
+    measurementData->fillN_dcb(kFALSE);
     b.Stop("N_dcb");
 
     // prepare the image & system matrix
@@ -127,8 +164,7 @@ ReconstructionOE::ReconstructionOE(const TString pathToMeasurements,
                                                              systemMatrixData->numberOfBins);
 
     if (isCalculationValid){
-        systemMatrixData->createSystemMatrix(normalizeSpectra,
-                                             measurementData->numberOfDetectors);
+        systemMatrixData->createSystemMatrix(measurementData->numberOfDetectors);
     }
     b.Stop("p_dcb");
 
@@ -136,12 +172,15 @@ ReconstructionOE::ReconstructionOE(const TString pathToMeasurements,
     image = new ImageSpace(volume, systemMatrixData->size);
     b.Stop("A_v");
 
+    countsInVoxelsOfStates.reserve(10000);  // reserve enough memory for at least 10000 states
+
     std::cout << "\nN_dcb Creation Time:\t" << b.GetRealTime("N_dcb") << " s\n";
     std::cout << "\np_dcb Creation Time:\t" << b.GetRealTime("p_dcb") << " s\n";
     std::cout << "\nA_v Creation Time:\t" << b.GetRealTime("A_v") << " s\n";
 }
 
 ReconstructionOE::~ReconstructionOE(){
+    delete state;
     delete results;
     delete image;
     delete systemMatrixData;
@@ -158,9 +197,9 @@ void ReconstructionOE::start(const Int_t numberOfIterationsForEquilibirum, const
     // step 1: create initial state s_0 by randomly selecting possible origins for the detected events
     b.Start("stats");
     b.Start("S_0");
-    State initalState(measurementData->N_dcb);
-    initalState.generateRandomOrigins(image->numberOfVoxels, systemMatrixData->systemMatrixVector);
-    statesBeforeEquilibrium.push_back(initalState);
+    state = new State(measurementData->N_dcb);
+    std::vector<Int_t> countsInVoxel = state->generateRandomOrigins(image->numberOfVoxels,
+                                                                    systemMatrixData->systemMatrixVector);
     b.Stop("S_0");
     std::cout << "\nS_0 Creation Time:\t" << b.GetRealTime("S_0") << " s\n";
 
@@ -184,6 +223,7 @@ void ReconstructionOE::start(const Int_t numberOfIterationsForEquilibirum, const
     std::cout << "\nCalculation Time:\t" << b.GetRealTime("stats") << " seconds\n";
 
     // step 5: show results
+    image->A_v->Scale(1.0 / image->A_v->Integral());
     results->plot(image->A_v);
 }
 
@@ -191,26 +231,33 @@ void ReconstructionOE::start(const Int_t numberOfIterationsForEquilibirum, const
 void ReconstructionOE::reachEquilibrium(const Int_t numberOfIterations){
     // generate random states until equilibrium is reached
 
+    std::vector<Double_t> relTransitionsXaxis;
+    std::vector<Double_t> relTransitionsYaxis;
+
     for (Int_t n = 0; n < numberOfIterations; ++n){
-        State nextState = statesBeforeEquilibrium.back();
-        nextState.MCMCNextState(systemMatrixData->systemMatrixVector, systemMatrixData->sensitivities);
-        statesBeforeEquilibrium.push_back(nextState);
+        Double_t relTransitions;
+        std::vector<Int_t> countsInVoxel = state->MCMCNextState(systemMatrixData->systemMatrixVector,
+                                                                systemMatrixData->sensitivities,
+                                                                relTransitions);
+        relTransitionsXaxis.push_back(n + 1);
+        relTransitionsYaxis.push_back(relTransitions);
     }
+
+    results->plotTransitions(relTransitionsXaxis, relTransitionsYaxis);
 }
 
 void ReconstructionOE::sampleEquilibriumStates(const Int_t numberOfIterations){
     // generate states in equilibrium
 
-    State equilibriumState = statesBeforeEquilibrium.back();
-    statesInEquilibrium.push_back(equilibriumState);
-
     for (Int_t n = 0; n < numberOfIterations; ++n){
-        State nextState = statesInEquilibrium.back();
-        nextState.MCMCNextState(systemMatrixData->systemMatrixVector, systemMatrixData->sensitivities);
+        Double_t relTransitions;
+        std::vector<Int_t> countsInVoxel = state->MCMCNextState(systemMatrixData->systemMatrixVector,
+                                                                systemMatrixData->sensitivities,
+                                                                relTransitions);
 
-        if (n % 5 == 0){
+        if (n % 1 == 0){
             // save every state, can be changed according to needs
-            statesInEquilibrium.push_back(nextState);
+            countsInVoxelsOfStates.push_back(countsInVoxel);
         }
     }
 }
@@ -218,19 +265,19 @@ void ReconstructionOE::sampleEquilibriumStates(const Int_t numberOfIterations){
 void ReconstructionOE::calculateActivity(){
     // calculate the voxel-specific means of the detected counts
 
-    Int_t numberOfStates = statesInEquilibrium.size();
+    Int_t numberOfStates = countsInVoxelsOfStates.size();
     for (Int_t v = 0; v < image->numberOfVoxels; ++v){
 
         // calculate the mean counts
-        Double_t meanCountInVoxel = 0.0;
+        Double_t meanCountsInVoxel = 0.0;
         for (Int_t c = 0; c < numberOfStates; ++c){
-            meanCountInVoxel += statesInEquilibrium.at(c).countsInVoxel.at(v);
+            meanCountsInVoxel += countsInVoxelsOfStates.at(c).at(v);
         }
-        meanCountInVoxel = meanCountInVoxel / numberOfStates;
+        meanCountsInVoxel /= numberOfStates;
 
-        // calculate the mean activity
+        // calculate the activity
         Double_t sensitivityOfVoxel = systemMatrixData->sensitivities.at(v);
-        Double_t activityInVoxel = meanCountInVoxel / sensitivityOfVoxel;
+        Double_t activityInVoxel = meanCountsInVoxel / sensitivityOfVoxel;
 
         // assign mean activity to voxel in image space
         std::array<Int_t, 3> coordinate = image->imageIndices.at(v);

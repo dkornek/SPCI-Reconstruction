@@ -1,4 +1,8 @@
 // measurements.h
+//
+// author: Dominik Kornek <dominik.kornek@gmail.com>
+// last modified: 19-08-27
+
 
 #pragma once
 #include <algorithm>
