@@ -1,4 +1,4 @@
-// ROOT Macro to create a base file out of the GEANT4 simulation
+// ROOT Macro to create the system matrix based on the GEANT4 simulation
 
 // author: Dominik Kornek <dominik.kornek@gmail.com>
 // last modified: 19-05-10
@@ -117,7 +117,7 @@ void createVoxelList(TFile* fIn, TFile* fOut){
     }
 }
 
-void CreateBaseFile(){
+void CreateSystemMatrix(){
 
     // open simulation file
     TString pathToSimulation = "../folder/subfolder/simulation.root";

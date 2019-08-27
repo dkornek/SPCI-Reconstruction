@@ -116,7 +116,7 @@ std::vector<Double_t> calculateSumOfSMCoef(std::vector<std::vector<Double_t> > S
         Double_t sumOverVoxels = 0;
         std::for_each(c.begin(), c.end(), [&] (Double_t n){ sumOverVoxels += n;	});
 
-	sumVector.push_back(sumOverVoxels); });
+    sumVector.push_back(sumOverVoxels); });
 
     return sumVector;
 }
@@ -142,12 +142,12 @@ std::vector<Double_t> calculateIntricacies(std::vector<std::vector<Double_t> > S
             }
         });
 
-	if (zeta != 0){
-	    zeta *= -1;
-	    zetas.push_back(zeta);
-	}
+    if (zeta != 0){
+        zeta *= -1;
+        zetas.push_back(zeta);
+    }
 
-	++nEl; });
+    ++nEl; });
 
     return zetas;
 }
@@ -166,7 +166,7 @@ Double_t calculateMeanZeta(std::vector<Double_t> RORzetas){
 
 void Intricacy(){
 
-    TString pathToSystemMatrix = "../../data/SystemMatrix/Original/SPCIBase441.root";
+    TString pathToSystemMatrix = "../../data/SystemMatrix/SPCIBase441_B2.root";
     TFile* input = new TFile(pathToSystemMatrix, "READ");
 
     if (!input->IsOpen()){

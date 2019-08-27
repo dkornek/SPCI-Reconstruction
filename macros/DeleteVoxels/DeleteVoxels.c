@@ -22,7 +22,7 @@ std::pair<bool, int> findInVector(const std::vector<T>& vecOfElements, const T& 
         return result;
 }
 
-void ChooseVoxelsInSM(){
+void DeleteVoxels(){
 
     TString pathToSM = "../../data/SystemMatrix/Original/SPCIBase441_above.root";
     TFile* input = new TFile(pathToSM, "UPDATE");

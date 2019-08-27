@@ -1,4 +1,4 @@
-// ROOT Macro to change the detector array
+// ROOT Macro to define the coincident pairs given all pairs
 
 void getStats(TFile* f, Int_t& nDet, Int_t& nBin, Double_t& rMin, Double_t& rMax){
     // extract index of both the detectors from the name of the spectrum
@@ -86,11 +86,11 @@ void addSpectraToList(TFile* f, TList* l, std::vector<Int_t> detID){
     }
 }
 
-void DetectorSize(){
+void CoincidentPairs(){
 
     // open measurements file
     TString pathToMeasurement = "../folder/subfolder/measurement.root";
-    pathToMeasurement = "../../data/Measurements/SPCIBase49/Bins50/SourcePos0+24+26+36.root";
+    pathToMeasurement = "../../data/Measurements/SixPoints/SixPoints_B50_N9E8_Noise.root";
     TFile* input = new TFile(pathToMeasurement, "READ");
     if (!input->IsOpen()){
         std::cout << "Measurement file not found!\n";
@@ -98,7 +98,7 @@ void DetectorSize(){
     }
 
     // open file for saving new detector arrangement
-    TFile* output = new TFile("SourcePos0+24+26+36_NewDesignNarrow.root", "RECREATE");
+    TFile* output = new TFile("SixPoints_B50_N9E8_Noise_5_7_13_15.root", "RECREATE");
     if (!output->IsOpen()){
         std::cout << "Output file could not be created!\n";
         return;
@@ -106,7 +106,7 @@ void DetectorSize(){
 
     // choose detectors to be considered
     TList* spectraList = createEmptySpectraList(input);
-    std::vector<Int_t> detectorID = { 0, 2, 8, 10 };  // change here!
+    std::vector<Int_t> detectorID = { 5, 7, 13, 15 };  // change here!
 
     // add spectra to list
     addSpectraToList(input, spectraList, detectorID);

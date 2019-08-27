@@ -1,4 +1,4 @@
-// this macro reads a tree of histograms and rebins them. The new file is saved.
+// This ROOT-macro reads a tree of histograms and rebins them. The number of bins can only be reduced. The new file is saved.
 
 TString newFileName(TString str, int bins){
     // create new file name based on the original name and the new number of bins
@@ -18,6 +18,7 @@ TString newFileName(TString str, int bins){
 }
 
 Bool_t isBinningConsistent(int nSpectra, int nBins, double& intPart){
+    // check if all spectra follow the same binning pattern
 
     double ratio;
     ratio = (double)nBins / (double)nSpectra;
@@ -32,8 +33,9 @@ Bool_t isBinningConsistent(int nSpectra, int nBins, double& intPart){
 }
 
 int getFactor(double intPart){
-    int rebinningFactor;  // how many bins will be combined into one
+    // choose the rebinning factor, i. e. the number of bins combined into one
 
+    int rebinningFactor;
     cout << "There are " << intPart << " bins in each histogram.\n";
     cout << "Type rebinning factor: ";
     cin >> rebinningFactor;
