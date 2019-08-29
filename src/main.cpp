@@ -1,16 +1,18 @@
 /*
 This project executes the image reconstruction for SPCI measurement data.
 To do so, two different algorithms can be used:
-- maximum likelihood expectation maximization (ML-EM),
+- maximum-likelihood expectation-maximization (ML-EM),
 - origin ensemble (OE).
-*/
 
+author: Dominik Kornek <dominik.kornek@gmail.com>
+last modified: 2018-08-28
+*/
 #include "navigation.h"
 
-int main(){
+int main(int argc, char *argv[]){
     // start application
     TemplateMenu* currentMenu;
-    currentMenu = new MainMenu;
+    currentMenu = new MainMenu();
 
     bool isQuitOptionSelected;
     isQuitOptionSelected = false;  // shut down application if true

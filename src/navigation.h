@@ -4,8 +4,6 @@
 #pragma once
 #include <iostream>
 #include <string>
-#include <TString.h>
-
 
 class TemplateMenu{
 public:
@@ -24,24 +22,32 @@ public:
     TemplateMenu* getNextMenu(bool& isQuitOptionSelected);
 };
 
-class ReconstructionMenu : public TemplateMenu{
+class SystemMatrixMenu : public TemplateMenu{
 public:
-    ReconstructionMenu();
+    SystemMatrixMenu();
     TemplateMenu* getNextMenu(bool& isQuitOptionSelected);
 };
 
-class AlgorithmMenu : public TemplateMenu{
+class MeasurementsMenu : public TemplateMenu{
 public:
-    AlgorithmMenu(TString filePathToMeasurements, TString filePathToProjections);
+    MeasurementsMenu();
     TemplateMenu* getNextMenu(bool& isQuitOptionSelected);
-    TString pathToMeasurements;
-    TString pathToProjections;
+};
+
+class AlgorithMenu : public TemplateMenu{
+public:
+    AlgorithMenu();
+    TemplateMenu* getNextMenu(bool& isQuitOptionSelected);
 };
 
 class MLEMMenu : public TemplateMenu{
 public:
-    MLEMMenu(TString filePathToMeasurements, TString filePathToProjections);
+    MLEMMenu();
     TemplateMenu* getNextMenu(bool& isQuitOptionSelected);
-    TString pathToMeasurements;
-    TString pathToProjections;
+};
+
+class OEMenu : public TemplateMenu{
+public:
+    OEMenu();
+    TemplateMenu* getNextMenu(bool& isQuitOptionSelected);
 };
